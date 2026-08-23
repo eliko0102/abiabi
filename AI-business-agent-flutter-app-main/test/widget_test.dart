@@ -10,18 +10,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_business_agent/main.dart';
 
 void main() {
-  testWidgets('opens the dashboard after guest access', (tester) async {
+  testWidgets('does not offer guest access and shows the auth form', (tester) async {
     await tester.pumpWidget(const AiBusinessAgentApp());
 
-    final guestButton = find.text('Qonaq kimi davam et');
-    await tester.ensureVisible(guestButton);
-    await tester.tap(guestButton);
+    expect(find.text('Qonaq kimi davam et'), findsNothing);
+    await tester.tap(find.text('Qeydiyyat'));
     await tester.pumpAndSettle();
 
-    expect(find.text('AI Business Agent'), findsWidgets);
-    expect(find.text('EAI Analytics'), findsOneWidget);
-    expect(find.textContaining('Köhnə nöqtəni'), findsOneWidget);
-    expect(find.textContaining('Yeni nöqtə'), findsOneWidget);
-    expect(find.text('Panel'), findsOneWidget);
+    expect(find.text('Ad və soyad'), findsOneWidget);
+    expect(find.text('Telefon'), findsOneWidget);
+    expect(find.text('Doğum tarixi'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Apple'), findsOneWidget);
   });
 }

@@ -11,6 +11,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'services/ai_service.dart';
 import 'services/report_service.dart';
 import 'services/mongo_auth_service.dart';
+import 'services/social_auth_service.dart';
 import 'services/business_api_service.dart';
 import 'config/api_config.dart';
 import 'screens/product_flow.dart';
@@ -882,6 +883,7 @@ class _HomeShellState extends State<HomeShell> {
       LocationAnalysisController();
   int _selectedIndex = 0;
   bool _authenticated = false;
+  Map<String, dynamic>? _currentUser;
   bool _showNotifications = false;
   int? _activeFlow;
   String _auditAddress = '';
@@ -968,8 +970,9 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           if (!_authenticated)
             AuthScreen(
-              onAuthenticated: () => setState(() {
+              onAuthenticated: (user) => setState(() {
                 _authenticated = true;
+                _currentUser = user;
                 _selectedIndex = 0;
                 _activeFlow = null;
               }),
@@ -987,6 +990,7 @@ class _HomeShellState extends State<HomeShell> {
                 MapScreen(controller: _locationController),
                 ChatScreen(controller: _locationController),
                 ProfileScreen(
+                  user: _currentUser,
                   onLocaleChanged: widget.onLocaleChanged,
                   currentLocaleCode: widget.currentLocaleCode,
                   onToggleTheme: widget.onToggleTheme,
@@ -1213,7 +1217,7 @@ class AuthScreen extends StatefulWidget {
     required this.currentLocaleCode,
   });
 
-  final VoidCallback onAuthenticated;
+  final ValueChanged<Map<String, dynamic>> onAuthenticated;
   final ValueChanged<Locale> onLocaleChanged;
   final String currentLocaleCode;
 
@@ -1223,54 +1227,66 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool _isRegister = false;
+  final TextEditingController _nameCtrl = TextEditingController();
+  final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   bool _staySignedIn = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
-  String _otpChannel = 'email';
+  DateTime? _dateOfBirth;
   final MongoAuthService _authService = MongoAuthService();
+  final SocialAuthService _socialAuthService = SocialAuthService();
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    final name = _nameCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final pass = _passwordCtrl.text.trim();
+    if (_isRegister && name.length < 3) {
+      _showError('Ad və soyad daxil edin.');
+      return;
+    }
+    if (_isRegister && phone.length < 7) {
+      _showError('Düzgün mobil nömrə daxil edin.');
+      return;
+    }
+    if (_isRegister && _dateOfBirth == null) {
+      _showError('Doğum tarixini seçin.');
+      return;
+    }
     if (!email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('invalidEmail'))),
-      );
+      _showError(AppLocalizations.of(context).t('invalidEmail'));
       return;
     }
     if (pass.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          content: Text(AppLocalizations.of(context).t('weakPassword')),
-        ),
-      );
+      _showError(AppLocalizations.of(context).t('weakPassword'));
       return;
     }
     setState(() => _isLoading = true);
     try {
       if (_isRegister) {
-        await _authService.signUp(
-          name: email.split('@').first,
+        final user = await _authService.signUp(
+          name: name,
           email: email,
           password: pass,
+          phone: phone,
+          dateOfBirth: _dateOfBirth,
         );
+        if (mounted) widget.onAuthenticated(user);
       } else {
-        await _authService.login(email: email, password: pass);
+        final user = await _authService.login(email: email, password: pass);
+        if (mounted) widget.onAuthenticated(user);
       }
-      if (mounted) widget.onAuthenticated();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1278,6 +1294,46 @@ class _AuthScreenState extends State<AuthScreen> {
           content: Text(error.toString().replaceFirst('Exception: ', '')),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        content: Text(message),
+      ),
+    );
+  }
+
+  Future<void> _selectDateOfBirth() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(now.year - 25, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(now.year - 13, now.month, now.day),
+      helpText: 'Doğum tarixini seçin',
+    );
+    if (selected != null) setState(() => _dateOfBirth = selected);
+  }
+
+  Future<void> _socialSignIn({required bool apple}) async {
+    setState(() => _isLoading = true);
+    try {
+      final user = apple
+          ? await _socialAuthService.signInWithApple()
+          : await _socialAuthService.signInWithGoogle();
+      if (mounted) widget.onAuthenticated(user);
+    } catch (error) {
+      if (mounted) {
+        _showError(error.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1373,53 +1429,93 @@ class _AuthScreenState extends State<AuthScreen> {
                             onChanged: (v) => setState(() => _isRegister = v),
                           ),
                           const SizedBox(height: AppSpacing.lg),
-                          Text(
-                            loc.t('otpMethod'),
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                          Row(
                             children: [
-                              ChoiceChip(
-                                label: Text(loc.t('emailOtp')),
-                                selected: _otpChannel == 'email',
-                                onSelected: (_) =>
-                                    setState(() => _otpChannel = 'email'),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _socialSignIn(apple: false),
+                                  icon: const Icon(Icons.g_mobiledata),
+                                  label: const Text('Google'),
+                                ),
                               ),
-                              ChoiceChip(
-                                label: Text(loc.t('phoneOtp')),
-                                selected: _otpChannel == 'sms',
-                                onSelected: (_) =>
-                                    setState(() => _otpChannel = 'sms'),
-                              ),
-                              ChoiceChip(
-                                label: Text(loc.t('whatsappOtp')),
-                                selected: _otpChannel == 'whatsapp',
-                                onSelected: (_) =>
-                                    setState(() => _otpChannel = 'whatsapp'),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _socialSignIn(apple: true),
+                                  icon: const Icon(Icons.apple),
+                                  label: const Text('Apple'),
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: AppSpacing.md),
+                          Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Text(
+                                  'və ya',
+                                  style: TextStyle(color: scheme.outline),
+                                ),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          if (_isRegister) ...[
+                            TextField(
+                              controller: _nameCtrl,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Ad və soyad',
+                                prefixIcon: Icon(Icons.person_outline),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            TextField(
+                              controller: _phoneCtrl,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                labelText: loc.t('profilePhone'),
+                                hintText: '+994 50 123 45 67',
+                                prefixIcon: const Icon(Icons.phone_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            InkWell(
+                              onTap: _isLoading ? null : _selectDateOfBirth,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Doğum tarixi',
+                                  prefixIcon: Icon(Icons.cake_outlined),
+                                ),
+                                child: Text(
+                                  _dateOfBirth == null
+                                      ? 'Tarix seçin'
+                                      : '${_dateOfBirth!.day.toString().padLeft(2, '0')}.${_dateOfBirth!.month.toString().padLeft(2, '0')}.${_dateOfBirth!.year}',
+                                  style: TextStyle(
+                                    color: _dateOfBirth == null
+                                        ? scheme.outline
+                                        : scheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                          ],
                           TextField(
                             controller: _emailCtrl,
-                            keyboardType: _otpChannel == 'email'
-                                ? TextInputType.emailAddress
-                                : TextInputType.phone,
+                            keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              labelText: _otpChannel == 'email'
-                                  ? loc.t('emailAddress')
-                                  : loc.t('profilePhone'),
-                              hintText: _otpChannel == 'email'
-                                  ? 'example@mail.com'
-                                  : '+994 50 123 45 67',
-                              prefixIcon: Icon(
-                                _otpChannel == 'email'
-                                    ? Icons.alternate_email
-                                    : Icons.phone_outlined,
-                              ),
+                              labelText: loc.t('emailAddress'),
+                              hintText: 'example@mail.com',
+                              prefixIcon: const Icon(Icons.alternate_email),
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
@@ -1479,14 +1575,6 @@ class _AuthScreenState extends State<AuthScreen> {
                                         ? loc.t('register')
                                         : loc.t('login'),
                                   ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          OutlinedButton.icon(
-                            onPressed: _isLoading
-                                ? null
-                                : widget.onAuthenticated,
-                            icon: const Icon(Icons.person_outline),
-                            label: Text(loc.t('continueAsGuest')),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           Center(
@@ -3200,11 +3288,13 @@ class _ChatMessage {
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
     super.key,
+    required this.user,
     required this.onLocaleChanged,
     required this.currentLocaleCode,
     required this.onToggleTheme,
   });
 
+  final Map<String, dynamic>? user;
   final ValueChanged<Locale> onLocaleChanged;
   final String currentLocaleCode;
   final VoidCallback onToggleTheme;
@@ -3213,6 +3303,11 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final name = (user?['name'] as String?)?.trim();
+    final email = (user?['email'] as String?)?.trim();
+    final phone = (user?['phone'] as String?)?.trim();
+    final dateOfBirth = _formatDate(user?['dateOfBirth']);
+    final photoUrl = (user?['photoUrl'] as String?)?.trim();
 
     return SafeArea(
       child: ListView(
@@ -3226,7 +3321,12 @@ class ProfileScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: scheme.primary.withValues(alpha: 0.14),
-                    child: Icon(Icons.person, color: scheme.primary, size: 30),
+                    backgroundImage: photoUrl == null || photoUrl.isEmpty
+                        ? null
+                        : NetworkImage(photoUrl),
+                    child: photoUrl == null || photoUrl.isEmpty
+                        ? Icon(Icons.person, color: scheme.primary, size: 30)
+                        : null,
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
@@ -3234,13 +3334,17 @@ class ProfileScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Aysel Mammadova',
+                          name == null || name.isEmpty ? 'İstifadəçi' : name,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '+994 50 123 45 67',
+                          email == null || email.isEmpty
+                              ? (phone == null || phone.isEmpty
+                                    ? 'Hesab məlumatları'
+                                    : phone)
+                              : email,
                           style: TextStyle(color: scheme.outline),
                         ),
                       ],
@@ -3248,6 +3352,38 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            child: Column(
+              children: [
+                if (email != null && email.isNotEmpty)
+                  _SettingsRow(
+                    icon: Icons.email_outlined,
+                    color: scheme.primary,
+                    title: loc.t('emailAddress'),
+                    subtitle: email,
+                  ),
+                if (phone != null && phone.isNotEmpty) ...[
+                  const Divider(height: 1),
+                  _SettingsRow(
+                    icon: Icons.phone_outlined,
+                    color: AppColors.secondary,
+                    title: loc.t('profilePhone'),
+                    subtitle: phone,
+                  ),
+                ],
+                if (dateOfBirth.isNotEmpty) ...[
+                  const Divider(height: 1),
+                  _SettingsRow(
+                    icon: Icons.cake_outlined,
+                    color: const Color(0xFFF59E0B),
+                    title: 'Doğum tarixi',
+                    subtitle: dateOfBirth,
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -3299,6 +3435,13 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(dynamic value) {
+    if (value == null) return '';
+    final date = DateTime.tryParse(value.toString());
+    if (date == null) return value.toString();
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
   }
 }
 

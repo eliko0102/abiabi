@@ -5,16 +5,33 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
+// Apple Android web flow callback. Apple posts the authorization result here;
+// the plugin then receives it through the app's signinwithapple deep link.
+router.post('/apple/callback', (req, res) => {
+  const params = new URLSearchParams(req.body || {}).toString();
+  res.redirect(
+    `intent://callback?${params}#Intent;package=com.aiagent.com;scheme=signinwithapple;end`
+  );
+});
+
 // Signup route
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, businessType, phone } = req.body;
+    const { name, email, password, businessType, phone, dateOfBirth } = req.body;
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !phone || !dateOfBirth) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email, and password are required',
+        message: 'Ad, e-poçt, şifrə, mobil nömrə və doğum tarixi tələb olunur',
+      });
+    }
+
+    const parsedDateOfBirth = new Date(dateOfBirth);
+    if (Number.isNaN(parsedDateOfBirth.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doğum tarixi düzgün deyil',
       });
     }
 
@@ -36,7 +53,8 @@ router.post('/signup', async (req, res) => {
       email,
       password: hashedPassword,
       businessType: businessType || '',
-      phone: phone || '',
+      phone,
+      dateOfBirth: parsedDateOfBirth,
     });
 
     // Generate JWT token
@@ -56,6 +74,7 @@ router.post('/signup', async (req, res) => {
         email: user.email,
         businessType: user.businessType,
         phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
       },
     });
   } catch (error) {
@@ -116,6 +135,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         businessType: user.businessType,
         phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
       },
     });
   } catch (error) {

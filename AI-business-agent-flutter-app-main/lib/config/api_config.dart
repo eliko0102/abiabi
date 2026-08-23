@@ -27,6 +27,11 @@ class ApiConfig {
     'FIREBASE_WEB_API_KEY',
     defaultValue: '',
   );
+  static const appleServiceId = String.fromEnvironment('APPLE_SERVICE_ID');
+  static const appleRedirectUri = String.fromEnvironment(
+    'APPLE_REDIRECT_URI',
+    defaultValue: 'https://ai-business-agent-api.onrender.com/auth/apple/callback',
+  );
   static const stripePublishableKey = String.fromEnvironment(
     'STRIPE_PUBLISHABLE_KEY',
   );

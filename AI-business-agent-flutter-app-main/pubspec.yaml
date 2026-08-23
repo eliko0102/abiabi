@@ -47,6 +47,11 @@ dependencies:
   printing: ^5.14.2
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.3
+  crypto: ^3.0.6
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.3
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
 
 dev_dependencies:
   flutter_test:

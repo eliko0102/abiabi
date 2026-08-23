@@ -27,6 +27,7 @@ class MongoAuthService {
     required String password,
     String? businessType,
     String? phone,
+    DateTime? dateOfBirth,
   }) async {
     if (ApiConfig.backendUrl.isEmpty) {
       throw const AuthException(
@@ -44,6 +45,7 @@ class MongoAuthService {
           'password': password,
           'businessType': businessType ?? '',
           'phone': phone ?? '',
+          if (dateOfBirth != null) 'dateOfBirth': dateOfBirth.toIso8601String(),
         }),
       );
 

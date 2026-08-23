@@ -6,8 +6,9 @@ void main() {
     await tester.pumpWidget(const AiBusinessAgentApp());
 
     expect(find.text('AI Business Agent'), findsWidgets);
-    expect(find.text('Giriş üsulu'), findsOneWidget);
     expect(find.text('Qeydiyyat'), findsOneWidget);
-    expect(find.text('Qonaq kimi davam et'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Apple'), findsOneWidget);
+    expect(find.text('Qonaq kimi davam et'), findsNothing);
   });
 }
