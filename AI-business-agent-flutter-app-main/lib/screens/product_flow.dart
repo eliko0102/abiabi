@@ -454,7 +454,9 @@ class AuditReportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final score = analysis?['score']?.toString() ?? '—';
-    final traffic = analysis?['pedestrian_traffic']?.toString() ?? '—';
+    final traffic = analysis?['pedestrian_traffic'] == null
+        ? '—'
+        : '${analysis!['pedestrian_traffic']}/100';
     final competitors = analysis?['competitors_500m']?.toString() ?? '—';
     return SafeArea(
       child: ListView(
@@ -592,9 +594,11 @@ class NewPointAssistantScreen extends StatefulWidget {
     super.key,
     required this.onBack,
     required this.onMap,
+    required this.onAnalyze,
   });
   final VoidCallback onBack;
   final VoidCallback onMap;
+  final Future<void> Function(String businessType, String address) onAnalyze;
 
   @override
   State<NewPointAssistantScreen> createState() =>
@@ -637,7 +641,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     });
   }
 
-  void _choose(String value) {
+  Future<void> _choose(String value) async {
     _add('user', value);
     if (value == 'Sıfırdan axtarmaq') {
       _mode = 'new';
@@ -664,22 +668,33 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       _add('assistant', 'İndi şəhər və ya axtarılacaq ərazini yazın.');
     } else if (_mode == 'address' && _address != null && _business == null) {
       _business = value;
-      _finishFlow();
+      await _finishFlow();
     } else if (_business == null) {
       _business = value;
       _add('assistant', 'Ünvanı və ya şəhəri yazın.');
     } else {
       _address = value;
-      _finishFlow();
+      await _finishFlow();
     }
   }
 
-  void _finishFlow() {
-    _add(
-      'assistant',
-      'Məlumatlar hazırdır. Zonalara xəritədə baxa və rəqibləri müqayisə edə bilərsiniz.',
-      actions: const ['ZONALARA XƏRİTƏDƏ BAX'],
-    );
+  Future<void> _finishFlow() async {
+    if (_business == null || _address == null) return;
+    setState(() => _loading = true);
+    try {
+      await widget.onAnalyze(_business!, _address!);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _add(
+        'assistant',
+        'Canlı 2GIS analizi hazırdır. Zonalara xəritədə baxa və rəqibləri müqayisə edə bilərsiniz.',
+        actions: const ['ZONALARA XƏRİTƏDƏ BAX'],
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _add('assistant', '2GIS analizi alınmadı: $error');
+    }
   }
 
   Future<void> _send() async {
@@ -704,7 +719,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     }
     if (_business != null && _address == null) {
       _address = text;
-      _finishFlow();
+      await _finishFlow();
       return;
     }
     setState(() => _loading = true);

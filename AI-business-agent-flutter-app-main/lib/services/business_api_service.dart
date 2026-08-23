@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
-/// One place for all Tochka backend calls. The UI can be developed against
-/// these contracts now and the real provider keys can be supplied later.
+/// Location analysis client. 2GIS keys stay on the Node backend; the mobile
+/// app only receives the normalized analysis payload.
 class BusinessApiService {
   BusinessApiService({http.Client? client}) : _client = client ?? http.Client();
   final http.Client _client;
@@ -13,9 +13,9 @@ class BusinessApiService {
     required String businessType,
     String address = '',
   }) async {
-    return _post('/analysis/location', {
+    return _post('/api/location-analysis', {
       'city': city,
-      'business_type': businessType,
+      'businessType': businessType,
       'address': address,
     });
   }
@@ -37,29 +37,37 @@ class BusinessApiService {
     required double averageTicket,
     double margin = .35,
   }) async {
-    return _post('/analysis/roi', {
+    return _post('/api/roi', {
       'rent': rent,
-      'average_ticket': averageTicket,
+      'averageTicket': averageTicket,
       'margin': margin,
     });
   }
 
-  Future<Map<String, dynamic>> generateNegotiationText({required String address, required List<String> risks}) async {
-    return _post('/analysis/negotiate', {'address': address, 'risks': risks});
+  Future<Map<String, dynamic>> generateNegotiationText({
+    required String address,
+    required List<String> risks,
+  }) async {
+    return _post('/api/negotiate', {'address': address, 'risks': risks});
   }
 
-  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     final response = await _client.post(
-      Uri.parse('${ApiConfig.baseUrl}$path'),
-      headers: {'Content-Type': 'application/json', if (ApiConfig.hasAiKey) 'Authorization': 'Bearer ${ApiConfig.aiApiKey}'},
+      Uri.parse('${ApiConfig.backendUrl}$path'),
+      headers: const {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       String message = response.body;
       try {
         final error = jsonDecode(response.body);
-        if (error is Map<String, dynamic> && error['detail'] is String) {
-          message = error['detail'] as String;
+        if (error is Map<String, dynamic>) {
+          message =
+              (error['error'] ?? error['message'] ?? error['detail'] ?? message)
+                  .toString();
         }
       } catch (_) {
         // Keep the raw response when the server does not return JSON.

@@ -1,5 +1,6 @@
 import express from 'express';
 import axios from 'axios';
+import { analyze2GisLocation } from '../services/twogis.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -98,8 +99,9 @@ router.post('/chat', async (req, res) => {
   }
 });
 
-// Location analysis endpoint
-router.post('/location-analysis', verifyToken, async (req, res) => {
+// Location analysis endpoint. It is intentionally usable by guest chat so the
+// user can discover a location before deciding to create an account.
+router.post('/location-analysis', async (req, res) => {
   try {
     const { city, businessType, address } = req.body;
 
@@ -110,22 +112,23 @@ router.post('/location-analysis', verifyToken, async (req, res) => {
       });
     }
 
-    // TODO: Integrate with AI service for location analysis
-    const response = {
-      success: true,
-      message: 'Location analysis endpoint ready',
+    const analysis = await analyze2GisLocation({
       city,
       businessType,
-      address,
-      userId: req.user.id,
-    };
+      address: address || city,
+    });
 
-    res.status(200).json(response);
+    res.status(200).json({
+      ...analysis,
+      city,
+      businessType,
+      userId: req.user?.id || null,
+    });
   } catch (error) {
     console.error('Location analysis error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error analyzing location',
+      message: '2GIS location analysis failed',
       error: error.message,
     });
   }

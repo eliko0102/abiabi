@@ -1001,6 +1001,7 @@ class _HomeShellState extends State<HomeShell> {
           if (_authenticated && _activeFlow == 2)
             NewPointAssistantScreen(
               onBack: () => setState(() => _activeFlow = null),
+              onAnalyze: _runChatLocationAnalysis,
               onMap: () => setState(() {
                 _activeFlow = null;
                 _selectedIndex = 1;
@@ -1058,10 +1059,22 @@ class _HomeShellState extends State<HomeShell> {
     );
     if (!mounted) return _locationController.analysis;
     setState(() {
-      _auditAddress = address;
+      _auditAddress = (_locationController.analysis?['address'] ?? address)
+          .toString();
       _activeFlow = 3;
     });
     return _locationController.analysis;
+  }
+
+  Future<void> _runChatLocationAnalysis(
+    String businessType,
+    String address,
+  ) async {
+    await _locationController.analyze(
+      city: address,
+      businessType: businessType,
+      address: address,
+    );
   }
 }
 
@@ -2254,6 +2267,7 @@ class _MapScreenState extends State<MapScreen> {
   _CityPin? _customPin;
   String _search = '';
   bool _isSearching = false;
+  String? _lastAnalysisUpdate;
 
   List<_CityPin> get _visibleCities => _cities
       .where((city) => city.name.toLowerCase().contains(_search.toLowerCase()))
@@ -2266,7 +2280,29 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onControllerChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final analysis = widget.controller.analysis;
+    final updatedAt = analysis?['updated_at']?.toString();
+    final point = _analysisPoint(analysis);
+    if (point != null &&
+        updatedAt != null &&
+        updatedAt != _lastAnalysisUpdate) {
+      _lastAnalysisUpdate = updatedAt;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(point, 15);
+      });
+    }
+    setState(() {});
+  }
+
+  LatLng? _analysisPoint(Map<String, dynamic>? analysis) {
+    final raw = analysis?['point'];
+    if (raw is! Map) return null;
+    final lat = double.tryParse(raw['lat']?.toString() ?? '');
+    final lon = double.tryParse(raw['lon']?.toString() ?? '');
+    if (lat == null || lon == null) return null;
+    return LatLng(lat, lon);
   }
 
   @override
@@ -2549,6 +2585,22 @@ class _MapScreenState extends State<MapScreen> {
                                   size: 46,
                                 ),
                               ),
+                            if (_analysisPoint(widget.controller.analysis) !=
+                                null)
+                              Marker(
+                                point: _analysisPoint(
+                                  widget.controller.analysis,
+                                )!,
+                                width: 70,
+                                height: 70,
+                                alignment: Alignment.topCenter,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Color(0xFF8E44FF),
+                                  size: 52,
+                                ),
+                              ),
+                            ..._liveCompetitorMarkers(scheme),
                           ],
                         ),
                         RichAttributionWidget(
@@ -2679,6 +2731,32 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+
+  List<Marker> _liveCompetitorMarkers(ColorScheme scheme) {
+    final raw = widget.controller.analysis?['competitors'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((item) {
+          final point = item['point'];
+          final lat = double.tryParse(point?['lat']?.toString() ?? '');
+          final lon = double.tryParse(point?['lon']?.toString() ?? '');
+          if (lat == null || lon == null) return null;
+          return Marker(
+            point: LatLng(lat, lon),
+            width: 42,
+            height: 42,
+            alignment: Alignment.topCenter,
+            child: Tooltip(
+              message:
+                  '${item['name'] ?? 'Rəqib'} • ${item['distance_meters'] ?? '—'} m',
+              child: Icon(Icons.storefront, color: scheme.error, size: 28),
+            ),
+          );
+        })
+        .whereType<Marker>()
+        .toList();
   }
 }
 
@@ -2830,6 +2908,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       await widget.controller.analyzeFromPrompt(prompt);
+      final liveAnalysis = widget.controller.contextForAi;
+      if (liveAnalysis != null && mounted) {
+        setState(() {
+          _messages.add(
+            _ChatMessage(
+              author: 'assistant',
+              text: _formatLiveAnalysis(liveAnalysis),
+            ),
+          );
+        });
+      }
       final answer = await _aiService.generateResponse(
         prompt,
         locationContext: widget.controller.contextForAi,
@@ -2854,6 +2943,19 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     }
     _scrollToBottom();
+  }
+
+  String _formatLiveAnalysis(Map<String, dynamic> analysis) {
+    final score = analysis['score']?.toString() ?? '—';
+    final traffic = analysis['pedestrian_traffic']?.toString() ?? '—';
+    final competitors = analysis['competitors_500m']?.toString() ?? '—';
+    final nearest = analysis['nearest_competitor_meters']?.toString() ?? '—';
+    return 'Canlı 2GIS hesabatı:\n'
+        '• Məkan indeksi: $score/100\n'
+        '• Piyada trafik indeksi: $traffic/100\n'
+        '• 500 m-də rəqiblər: $competitors\n'
+        '• Ən yaxın rəqib: $nearest m\n\n'
+        'Rəqiblərin nöqtələrini Xəritə panelində görə bilərsiniz.';
   }
 
   Future<void> _toggleListening() async {
