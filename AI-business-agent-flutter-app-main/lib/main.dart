@@ -2510,6 +2510,7 @@ class _MapScreenState extends State<MapScreen> {
   String _search = '';
   bool _isSearching = false;
   String? _lastAnalysisUpdate;
+  LatLng? _pendingAnalysisPoint;
 
   List<_CityPin> get _visibleCities => _cities
       .where((city) => city.name.toLowerCase().contains(_search.toLowerCase()))
@@ -2530,12 +2531,24 @@ class _MapScreenState extends State<MapScreen> {
         updatedAt != null &&
         updatedAt != _lastAnalysisUpdate) {
       _lastAnalysisUpdate = updatedAt;
+      _pendingAnalysisPoint = point;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _mapController.move(point, 15);
+        _moveToPendingAnalysis();
       });
     }
     setState(() {});
+  }
+
+  void _moveToPendingAnalysis() {
+    final point = _pendingAnalysisPoint;
+    if (!mounted || point == null) return;
+    try {
+      _mapController.move(point, 15);
+      _pendingAnalysisPoint = null;
+    } catch (_) {
+      // FlutterMap may not be attached yet; onMapReady retries the move.
+    }
   }
 
   LatLng? _analysisPoint(Map<String, dynamic>? analysis) {
@@ -2755,6 +2768,7 @@ class _MapScreenState extends State<MapScreen> {
                         initialZoom: 4.6,
                         minZoom: 3,
                         maxZoom: 17,
+                        onMapReady: _moveToPendingAnalysis,
                         onTap: (_, __) => setState(() => _selected = null),
                       ),
                       children: [
