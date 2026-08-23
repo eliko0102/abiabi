@@ -8,7 +8,7 @@ const router = express.Router();
 // Chat endpoint supports guests; other analysis endpoints remain protected.
 router.post('/chat', async (req, res) => {
   try {
-    const { prompt, location_context: locationContext } = req.body;
+    const { prompt, location_context: locationContext, language = 'az' } = req.body;
 
     if (!prompt) {
       return res.status(400).json({
@@ -27,10 +27,12 @@ router.post('/chat', async (req, res) => {
       });
     }
 
+    const languageNames = { az: 'Azerbaijani', en: 'English', ru: 'Russian', kk: 'Kazakh' };
+    const responseLanguage = languageNames[language] || languageNames.az;
     const contextText = locationContext
       ? `\n\nCurrent live 2GIS location analysis:\n${JSON.stringify(locationContext)}`
       : '';
-    const groundedPrompt = `${prompt}${contextText}`;
+    const groundedPrompt = `Respond in ${responseLanguage}. Keep the answer concise and useful.\n\n${prompt}${contextText}`;
 
     // Call Gemini API
     if (provider === 'gemini') {

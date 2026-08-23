@@ -16,10 +16,11 @@ class AiService {
   Future<String> generateResponse(
     String prompt, {
     Map<String, dynamic>? locationContext,
+    String language = 'az',
   }) async {
     final normalizedPrompt = prompt.trim();
     if (normalizedPrompt.isEmpty) {
-      return 'Please enter a request for the AI assistant.';
+      return _message(language, 'emptyPrompt');
     }
 
     try {
@@ -32,6 +33,7 @@ class AiService {
         headers: headers,
         body: jsonEncode({
           'prompt': normalizedPrompt,
+          'language': language,
           if (locationContext != null) 'location_context': locationContext,
         }),
       );
@@ -45,7 +47,7 @@ class AiService {
         }
         return decoded.toString();
       } else if (response.statusCode == 401) {
-        return 'Session expired. Please login again.';
+        return _message(language, 'sessionExpired');
       }
       try {
         final decoded = jsonDecode(response.body);
@@ -61,9 +63,39 @@ class AiService {
       } catch (_) {
         // Fall through to the status code when the server did not return JSON.
       }
-      return 'AI server xətası (${response.statusCode})';
+      return '${_message(language, 'serverError')} (${response.statusCode})';
     } catch (e) {
-      return 'AI serverə qoşulmaq mümkün olmadı: $e';
+      return '${_message(language, 'connectionError')}: $e';
     }
+  }
+
+  String _message(String language, String key) {
+    const messages = {
+      'az': {
+        'emptyPrompt': 'AI assistentə sualınızı yazın.',
+        'sessionExpired': 'Sessiya bitib. Yenidən daxil olun.',
+        'serverError': 'AI server xətası',
+        'connectionError': 'AI serverə qoşulmaq mümkün olmadı',
+      },
+      'en': {
+        'emptyPrompt': 'Please enter a request for the AI assistant.',
+        'sessionExpired': 'Session expired. Please log in again.',
+        'serverError': 'AI server error',
+        'connectionError': 'Could not connect to the AI server',
+      },
+      'ru': {
+        'emptyPrompt': 'Введите запрос для AI-ассистента.',
+        'sessionExpired': 'Сессия завершена. Войдите снова.',
+        'serverError': 'Ошибка AI-сервера',
+        'connectionError': 'Не удалось подключиться к AI-серверу',
+      },
+      'kk': {
+        'emptyPrompt': 'AI көмекшіге сұрағыңызды жазыңыз.',
+        'sessionExpired': 'Сессия аяқталды. Қайта кіріңіз.',
+        'serverError': 'AI сервер қатесі',
+        'connectionError': 'AI серверіне қосылу мүмкін болмады',
+      },
+    };
+    return messages[language]?[key] ?? messages['az']![key]!;
   }
 }

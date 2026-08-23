@@ -738,7 +738,10 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       return;
     }
     setState(() => _loading = true);
-    final answer = await _ai.generateResponse(text);
+    final answer = await _ai.generateResponse(
+      text,
+      language: widget.localeCode,
+    );
     if (!mounted) return;
     setState(() => _loading = false);
     _add('assistant', answer);

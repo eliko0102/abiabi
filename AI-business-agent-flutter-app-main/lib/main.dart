@@ -3065,6 +3065,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       final answer = await _aiService.generateResponse(
         prompt,
+        language: AppLocalizations.of(context).locale.languageCode,
         locationContext: widget.controller.contextForAi,
       );
       if (!mounted) return;
