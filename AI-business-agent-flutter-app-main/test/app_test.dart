@@ -5,6 +5,7 @@ import 'package:ai_business_agent/screens/flow_localizations.dart';
 void main() {
   testWidgets('shows the authentication onboarding', (tester) async {
     await tester.pumpWidget(const AiBusinessAgentApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('AI Business Agent'), findsWidgets);
     expect(find.text('Qeydiyyat'), findsOneWidget);

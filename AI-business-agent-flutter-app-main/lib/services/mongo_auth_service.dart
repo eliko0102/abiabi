@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/api_config.dart';
 
 class AuthException implements Exception {
@@ -12,8 +13,15 @@ class AuthException implements Exception {
 /// MongoDB-based Authentication Service
 /// Uses Node.js backend with JWT tokens
 class MongoAuthService {
-  MongoAuthService({http.Client? client}) : _client = client ?? http.Client();
+  MongoAuthService({http.Client? client, FlutterSecureStorage? storage})
+    : _client = client ?? http.Client(),
+      _storage = storage ?? const FlutterSecureStorage();
   final http.Client _client;
+  final FlutterSecureStorage _storage;
+
+  static const _tokenKey = 'auth_token';
+  static const _userKey = 'auth_user';
+  static const _biometricKey = 'biometric_enabled';
 
   String? _token;
 
@@ -52,6 +60,7 @@ class MongoAuthService {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         _token = data['token'];
+        await _persistSession(data['user']);
         return data['user'];
       } else if (response.statusCode == 400) {
         final error = jsonDecode(response.body);
@@ -89,6 +98,7 @@ class MongoAuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _token = data['token'];
+        await _persistSession(data['user']);
         return data['user'];
       } else if (response.statusCode == 401) {
         throw const AuthException('Email və ya şifrə səhvdir');
@@ -107,6 +117,36 @@ class MongoAuthService {
   // Logout
   Future<void> logout() async {
     _token = null;
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _userKey);
+    await _storage.delete(key: _biometricKey);
+  }
+
+  Future<Map<String, dynamic>?> restoreSession() async {
+    try {
+      final token = await _storage.read(key: _tokenKey);
+      final rawUser = await _storage.read(key: _userKey);
+      if (token == null || token.isEmpty || rawUser == null) return null;
+      final decoded = jsonDecode(rawUser);
+      if (decoded is! Map) return null;
+      _token = token;
+      return Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> get biometricEnabled async =>
+      (await _storage.read(key: _biometricKey)) == 'true';
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await _storage.write(key: _biometricKey, value: enabled.toString());
+  }
+
+  Future<void> _persistSession(dynamic user) async {
+    if (_token == null || user is! Map) return;
+    await _storage.write(key: _tokenKey, value: _token);
+    await _storage.write(key: _userKey, value: jsonEncode(user));
   }
 
   // Get authorization header

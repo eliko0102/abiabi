@@ -12,6 +12,7 @@ import 'services/ai_service.dart';
 import 'services/report_service.dart';
 import 'services/mongo_auth_service.dart';
 import 'services/social_auth_service.dart';
+import 'services/biometric_auth_service.dart';
 import 'services/business_api_service.dart';
 import 'config/api_config.dart';
 import 'screens/product_flow.dart';
@@ -80,6 +81,7 @@ class AppLocalizations extends InheritedWidget {
       'weakPassword': 'Şifrə ən azı 6 simvol olmalıdır.',
       'password': 'Şifrə',
       'staySignedIn': 'Daxil ol saxla',
+      'biometricLogin': 'Barmaq izi ilə daxil ol',
       'welcomeBack': 'Xoş gəlmisiniz',
       'description':
           'Biznes ideyaları, bazar analizi və yerli təkliflər üçün süni intellekt əsaslı yardım.',
@@ -218,6 +220,7 @@ class AppLocalizations extends InheritedWidget {
       'invalidEmail': 'Enter a valid email address.',
       'weakPassword': 'Password must be at least 6 characters.',
       'staySignedIn': 'Keep me signed in',
+      'biometricLogin': 'Sign in with fingerprint',
       'description':
           'AI-powered help for business ideas, market analysis and local offers.',
       'haveAccount': 'Already have an account?',
@@ -358,6 +361,7 @@ class AppLocalizations extends InheritedWidget {
       'weakPassword': 'Пароль должен содержать минимум 6 символов.',
       'password': 'Пароль',
       'staySignedIn': 'Оставаться в системе',
+      'biometricLogin': 'Войти по отпечатку пальца',
       'welcomeBack': 'С возвращением',
       'description':
           'Искусственный интеллект для бизнес-идей, анализа рынка и локальных рекомендаций.',
@@ -501,6 +505,7 @@ class AppLocalizations extends InheritedWidget {
       'weakPassword': 'Құпия сөз кемінде 6 таңбадан тұруы керек.',
       'password': 'Құпия сөз',
       'staySignedIn': 'Кіруді сақтаңыз',
+      'biometricLogin': 'Саусақ ізімен кіру',
       'welcomeBack': 'Қош келдіңіз',
       'description':
           'Жасанды интеллект арқылы бизнес идеялар, нарық талдауы және жергілікті ұсыныстар.',
@@ -935,6 +940,11 @@ class _HomeShellState extends State<HomeShell> {
       LocationAnalysisController();
   int _selectedIndex = 0;
   bool _authenticated = false;
+  bool _checkingSession = false;
+  bool _canBiometricLogin = false;
+  Map<String, dynamic>? _savedUser;
+  final MongoAuthService _authService = MongoAuthService();
+  final BiometricAuthService _biometricService = BiometricAuthService();
   Map<String, dynamic>? _currentUser;
   bool _showNotifications = false;
   int? _activeFlow;
@@ -945,6 +955,48 @@ class _HomeShellState extends State<HomeShell> {
     'Aşağıdakı AI tapşırığınız üçün təklif hazırdır.',
     'Demo bildiriş: yeni şablon əlavə edildi.',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final user = await _authService.restoreSession();
+    final biometricEnabled = user != null && await _authService.biometricEnabled;
+    if (!mounted) return;
+    if (user != null && biometricEnabled) {
+      setState(() {
+        _savedUser = user;
+        _canBiometricLogin = true;
+        _checkingSession = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _unlockWithBiometric());
+    } else if (user != null) {
+      _completeAuthentication(user);
+    } else {
+      setState(() => _checkingSession = false);
+    }
+  }
+
+  Future<void> _unlockWithBiometric() async {
+    final user = _savedUser;
+    if (user == null || !await _biometricService.authenticate()) return;
+    _completeAuthentication(user);
+  }
+
+  void _completeAuthentication(Map<String, dynamic> user) {
+    if (!mounted) return;
+    setState(() {
+      _authenticated = true;
+      _currentUser = user;
+      _savedUser = user;
+      _selectedIndex = 0;
+      _activeFlow = null;
+      _checkingSession = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -1020,14 +1072,13 @@ class _HomeShellState extends State<HomeShell> {
           : null,
       body: Stack(
         children: [
-          if (!_authenticated)
+          if (_checkingSession)
+            const Center(child: CircularProgressIndicator())
+          else if (!_authenticated)
             AuthScreen(
-              onAuthenticated: (user) => setState(() {
-                _authenticated = true;
-                _currentUser = user;
-                _selectedIndex = 0;
-                _activeFlow = null;
-              }),
+              onAuthenticated: _completeAuthentication,
+              onBiometricAuthenticated: _unlockWithBiometric,
+              showBiometricButton: _canBiometricLogin,
               onLocaleChanged: widget.onLocaleChanged,
               currentLocaleCode: widget.currentLocaleCode,
             ),
@@ -1271,11 +1322,15 @@ class AuthScreen extends StatefulWidget {
     required this.onAuthenticated,
     required this.onLocaleChanged,
     required this.currentLocaleCode,
+    this.onBiometricAuthenticated,
+    this.showBiometricButton = false,
   });
 
   final ValueChanged<Map<String, dynamic>> onAuthenticated;
   final ValueChanged<Locale> onLocaleChanged;
   final String currentLocaleCode;
+  final Future<void> Function()? onBiometricAuthenticated;
+  final bool showBiometricButton;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -1290,9 +1345,20 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _staySignedIn = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _biometricAvailable = false;
+  bool _useBiometric = false;
   DateTime? _dateOfBirth;
   final MongoAuthService _authService = MongoAuthService();
   final SocialAuthService _socialAuthService = SocialAuthService();
+  final BiometricAuthService _biometricService = BiometricAuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _biometricService.isAvailable().then((available) {
+      if (mounted) setState(() => _biometricAvailable = available);
+    });
+  }
 
   @override
   void dispose() {
@@ -1341,6 +1407,9 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) widget.onAuthenticated(user);
       } else {
         final user = await _authService.login(email: email, password: pass);
+        if (_biometricAvailable) {
+          await _authService.setBiometricEnabled(_useBiometric);
+        }
         if (mounted) widget.onAuthenticated(user);
       }
     } catch (error) {
@@ -1508,6 +1577,24 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                             ],
                           ),
+                          if (_biometricAvailable && !_isRegister)
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _useBiometric,
+                                  onChanged: (value) => setState(
+                                    () => _useBiometric = value ?? false,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    loc.t('biometricLogin'),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
                           const SizedBox(height: AppSpacing.md),
                           Row(
                             children: [
@@ -1632,6 +1719,17 @@ class _AuthScreenState extends State<AuthScreen> {
                                         : loc.t('login'),
                                   ),
                           ),
+                          if (widget.showBiometricButton &&
+                              widget.onBiometricAuthenticated != null) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            OutlinedButton.icon(
+                              onPressed: _isLoading
+                                  ? null
+                                  : widget.onBiometricAuthenticated,
+                              icon: const Icon(Icons.fingerprint),
+                              label: Text(loc.t('biometricLogin')),
+                            ),
+                          ],
                           const SizedBox(height: AppSpacing.sm),
                           Center(
                             child: TextButton(

@@ -50,28 +50,74 @@ async function catalogGet(path, params, key) {
   });
   const code = response.data?.meta?.code;
   if (code && code !== 200) {
-    throw new Error(response.data?.meta?.error_message || `2GIS API error ${code}`);
+    const message =
+      response.data?.meta?.error_message ||
+      response.data?.meta?.error?.message ||
+      `2GIS API error ${code}`;
+    const error = new Error(message);
+    error.code = code;
+    throw error;
   }
   return response;
 }
 
-async function geocode(address, key) {
-  const response = await catalogGet(
-    '/3.0/items/geocode',
-    {
-      q: address,
-      fields: 'items.point,items.address,items.adm_div',
-      page_size: 5,
-    },
-    key,
-  );
-  const item = itemsFrom(response).find((candidate) => pointOf(candidate));
-  if (!item) throw new Error('2GIS ünvanı xəritədə tapa bilmədi');
-  return {
-    item,
-    point: pointOf(item),
-    address: item.full_name || item.address_name || address,
-  };
+async function geocode(address, city, key) {
+  const queries = [...new Set([
+    address,
+    city && city !== address ? `${city}, ${address}` : null,
+    address ? `${address}, Kazakhstan` : null,
+  ].filter(Boolean))];
+  let lastError;
+
+  for (const query of queries) {
+    try {
+      const response = await catalogGet(
+        '/3.0/items/geocode',
+        {
+          q: query,
+          fields: 'items.point,items.geometry.centroid,items.address,items.adm_div',
+          page_size: 5,
+        },
+        key,
+      );
+      const item = itemsFrom(response).find((candidate) => pointOf(candidate));
+      if (item) {
+        return {
+          source: '2GIS Catalog API',
+          item,
+          point: pointOf(item),
+          address: item.full_name || item.address_name || query,
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      if (error.code && error.code !== 404) throw error;
+    }
+  }
+
+  // 2GIS returns meta.code=404 for valid but unrecognised free-form input.
+  // Use OSM only to obtain coordinates, then keep all nearby analysis live from
+  // 2GIS. This prevents one bad address string from breaking the full report.
+  try {
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: { q: queries[0] || city, format: 'jsonv2', limit: 1 },
+      headers: { 'User-Agent': 'AI-Business-Agent/1.0 location fallback' },
+      timeout: 10000,
+    });
+    const result = response.data?.[0];
+    if (result) {
+      return {
+        source: 'OpenStreetMap fallback + 2GIS Catalog API',
+        item: null,
+        point: { lat: Number(result.lat), lon: Number(result.lon) },
+        address: result.display_name || queries[0] || city,
+      };
+    }
+  } catch (error) {
+    console.warn('Fallback geocoder failed:', error.message);
+  }
+
+  throw lastError || new Error('2GIS ünvanı xəritədə tapa bilmədi');
 }
 
 async function nearby(key, point, query, type = 'branch') {
@@ -107,7 +153,7 @@ export async function analyze2GisLocation({ address, city, businessType }) {
   const key = process.env.TWOGIS_API_KEY;
   if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
 
-  const geocoded = await geocode(address || city, key);
+  const geocoded = await geocode(address || city, city, key);
   const point = geocoded.point;
   const businessQuery = normalizeBusinessQuery(businessType);
 
@@ -149,7 +195,7 @@ export async function analyze2GisLocation({ address, city, businessType }) {
 
   return {
     success: true,
-    source: '2GIS Catalog API',
+    source: geocoded.source,
     updated_at: new Date().toISOString(),
     address: geocoded.address,
     point,

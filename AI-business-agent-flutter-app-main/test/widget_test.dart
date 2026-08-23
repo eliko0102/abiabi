@@ -12,6 +12,7 @@ import 'package:ai_business_agent/main.dart';
 void main() {
   testWidgets('does not offer guest access and shows the auth form', (tester) async {
     await tester.pumpWidget(const AiBusinessAgentApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Qonaq kimi davam et'), findsNothing);
     await tester.tap(find.text('Qeydiyyat'));
