@@ -13,6 +13,7 @@ import 'services/report_service.dart';
 import 'services/mongo_auth_service.dart';
 import 'services/business_api_service.dart';
 import 'config/api_config.dart';
+import 'screens/product_flow.dart';
 
 void main() {
   runApp(const AiBusinessAgentApp());
@@ -128,23 +129,58 @@ class AppLocalizations extends InheritedWidget {
       'openInMaps': 'İstiqamət al',
       'businessHotspot': 'İş imkanı bölgəsi',
       'noNotifications': 'Yeni bildiriş yoxdur',
-      'navDashboard': 'Panel', 'navMap': 'Xəritə', 'navAssistant': 'Assistant', 'navProfile': 'Profil',
-      'free': 'PULSUZ', 'nextIdeaTitle': 'Tochka.ai ilə növbəti məkanınızı risk etmədən seçin',
-      'nextIdeaSubtitle': 'İdeyanızı, büdcənizi və regionu yoxlayın. Sonra ən güclü 3 ünvanı müqayisə edin.',
-      'analysisStart': 'Analizə necə başlayaq?', 'idea': 'İdeya', 'place': 'Məkan', 'decision': 'Qərar',
-      'deepAnalytics': 'İlkin dərin analitika', 'viabilityForecast': 'Yaşama qabiliyyəti — ilk fəaliyyət ilində proqnoz',
-      'riskSimilarBusinesses': '500 m radiusda 6 analoji biznes var', 'riskVisibility': 'Giriş görünürlüğünü sahədə yoxlayın',
-      'unlockRisks': '2 kritik riski və tam hesablamanı aç', 'calculatorTitle': 'Xərcini çıxarma kalkulyatoru',
-      'monthlyRent': 'Aylıq icarə (₸)', 'averageTicket': 'Orta çek (₸)', 'calculate': 'Hesabla',
-      'customersNeeded': 'Mənfəətə çıxmaq üçün gündə təxminən {count} alıcı lazımdır.', 'plansTitle': 'Tochka.ai tarifləri',
-      'planFreeSubtitle': 'Üçfaktorlu çat + xəritə + məkan balı', 'planOneSubtitle': 'Tam analiz + PDF + danışıqlar mətni',
-      'planThreeSubtitle': 'Yanaşı müqayisə ilə tam analiz', 'continue': 'Davam et',
-      'searchAddressHint': 'Şəhər və ya ünvan axtar...', 'search': 'Axtar', 'addressNotFound': 'Ünvan tapılmadı. Daha dəqiq yazın.',
-      'locationIndex': 'Məkan indeksi', 'footTraffic': 'Piyada trafiki', 'high': 'Yüksək', 'competitors': 'Rəqiblər (500 m)', 'nearestDistance': 'Ən yaxın rəqib', 'analysisUnavailable': '2GIS analizi əlçatan deyil', 'analyzing': 'Analiz edilir...',
-      'locationPassport': 'PDF Məkan Pasportu', 'whatsappNegotiation': 'WhatsApp danışıqlar mətni',
-      'stopListening': 'Dinləməni dayandır', 'voiceInput': 'Səslə yaz', 'smsEmailWhatsapp': 'SMS, E-poçt, WhatsApp', 'languageEnglish': 'English',
-      'personaBaba': 'Müdrik Baba', 'personaBabaHint': 'Riskləri azaldır', 'personaMarketer': 'Kreativ Marketoloq', 'personaMarketerHint': 'Fərqlənməyə kömək edir', 'personaAnalyst': 'Sərt Analitik', 'personaAnalystHint': 'Quru rəqəmlər və ROI',
-      'assistantWelcome': 'Salam! Mən Müdrik Baba — biznes ideyanı və seçdiyin məkanı üç faktorlu yoxlama ilə analiz edəcəyəm. Başlayaq: hansı biznesi açmaq istəyirsən və hansı şəhərdə?',
+      'navDashboard': 'Panel',
+      'navMap': 'Xəritə',
+      'navAssistant': 'Assistant',
+      'navProfile': 'Profil',
+      'free': 'PULSUZ',
+      'nextIdeaTitle': 'Tochka.ai ilə növbəti məkanınızı risk etmədən seçin',
+      'nextIdeaSubtitle':
+          'İdeyanızı, büdcənizi və regionu yoxlayın. Sonra ən güclü 3 ünvanı müqayisə edin.',
+      'analysisStart': 'Analizə necə başlayaq?',
+      'idea': 'İdeya',
+      'place': 'Məkan',
+      'decision': 'Qərar',
+      'deepAnalytics': 'İlkin dərin analitika',
+      'viabilityForecast': 'Yaşama qabiliyyəti — ilk fəaliyyət ilində proqnoz',
+      'riskSimilarBusinesses': '500 m radiusda 6 analoji biznes var',
+      'riskVisibility': 'Giriş görünürlüğünü sahədə yoxlayın',
+      'unlockRisks': '2 kritik riski və tam hesablamanı aç',
+      'calculatorTitle': 'Xərcini çıxarma kalkulyatoru',
+      'monthlyRent': 'Aylıq icarə (₸)',
+      'averageTicket': 'Orta çek (₸)',
+      'calculate': 'Hesabla',
+      'customersNeeded':
+          'Mənfəətə çıxmaq üçün gündə təxminən {count} alıcı lazımdır.',
+      'plansTitle': 'Tochka.ai tarifləri',
+      'planFreeSubtitle': 'Üçfaktorlu çat + xəritə + məkan balı',
+      'planOneSubtitle': 'Tam analiz + PDF + danışıqlar mətni',
+      'planThreeSubtitle': 'Yanaşı müqayisə ilə tam analiz',
+      'continue': 'Davam et',
+      'searchAddressHint': 'Şəhər və ya ünvan axtar...',
+      'search': 'Axtar',
+      'addressNotFound': 'Ünvan tapılmadı. Daha dəqiq yazın.',
+      'locationIndex': 'Məkan indeksi',
+      'footTraffic': 'Piyada trafiki',
+      'high': 'Yüksək',
+      'competitors': 'Rəqiblər (500 m)',
+      'nearestDistance': 'Ən yaxın rəqib',
+      'analysisUnavailable': '2GIS analizi əlçatan deyil',
+      'analyzing': 'Analiz edilir...',
+      'locationPassport': 'PDF Məkan Pasportu',
+      'whatsappNegotiation': 'WhatsApp danışıqlar mətni',
+      'stopListening': 'Dinləməni dayandır',
+      'voiceInput': 'Səslə yaz',
+      'smsEmailWhatsapp': 'SMS, E-poçt, WhatsApp',
+      'languageEnglish': 'English',
+      'personaBaba': 'Müdrik Baba',
+      'personaBabaHint': 'Riskləri azaldır',
+      'personaMarketer': 'Kreativ Marketoloq',
+      'personaMarketerHint': 'Fərqlənməyə kömək edir',
+      'personaAnalyst': 'Sərt Analitik',
+      'personaAnalystHint': 'Quru rəqəmlər və ROI',
+      'assistantWelcome':
+          'Salam! Mən Müdrik Baba — biznes ideyanı və seçdiyin məkanı üç faktorlu yoxlama ilə analiz edəcəyəm. Başlayaq: hansı biznesi açmaq istəyirsən və hansı şəhərdə?',
     },
     'en': {
       'appTitle': 'AI Business Agent',
@@ -218,23 +254,59 @@ class AppLocalizations extends InheritedWidget {
       'openInMaps': 'Get directions',
       'businessHotspot': 'Business opportunity area',
       'noNotifications': 'No new notifications',
-      'navDashboard': 'Dashboard', 'navMap': 'Map', 'navAssistant': 'Assistant', 'navProfile': 'Profile',
-      'free': 'FREE', 'nextIdeaTitle': 'Choose your next location with Tochka.ai without unnecessary risk',
-      'nextIdeaSubtitle': 'Check your idea, budget and region, then compare the strongest 3 locations.',
-      'analysisStart': 'How should we start the analysis?', 'idea': 'Idea', 'place': 'Location', 'decision': 'Decision',
-      'deepAnalytics': 'Initial deep analytics', 'viabilityForecast': 'Viability forecast for the first year of operation',
-      'riskSimilarBusinesses': '6 similar businesses within a 500 m radius', 'riskVisibility': 'Check entrance visibility on site',
-      'unlockRisks': 'Unlock 2 critical risks and the full calculation', 'calculatorTitle': 'Break-even calculator',
-      'monthlyRent': 'Monthly rent (₸)', 'averageTicket': 'Average ticket (₸)', 'calculate': 'Calculate',
-      'customersNeeded': 'You need approximately {count} customers per day to break even.', 'plansTitle': 'Tochka.ai plans',
-      'planFreeSubtitle': 'Three-factor chat + map + location score', 'planOneSubtitle': 'Full analysis + PDF + negotiation text',
-      'planThreeSubtitle': 'Full analysis with side-by-side comparison', 'continue': 'Continue',
-      'searchAddressHint': 'Search city or address...', 'search': 'Search', 'addressNotFound': 'Address not found. Please be more specific.',
-      'locationIndex': 'Location index', 'footTraffic': 'Foot traffic', 'high': 'High', 'competitors': 'Competitors (500 m)', 'nearestDistance': 'Nearest competitor', 'analysisUnavailable': '2GIS analysis unavailable', 'analyzing': 'Analyzing...',
-      'locationPassport': 'PDF location passport', 'whatsappNegotiation': 'WhatsApp negotiation text',
-      'stopListening': 'Stop listening', 'voiceInput': 'Voice input', 'smsEmailWhatsapp': 'SMS, Email, WhatsApp', 'languageEnglish': 'English',
-      'personaBaba': 'Wise Baba', 'personaBabaHint': 'Reduces risk', 'personaMarketer': 'Creative Marketer', 'personaMarketerHint': 'Helps you stand out', 'personaAnalyst': 'Strict Analyst', 'personaAnalystHint': 'Dry numbers and ROI',
-      'assistantWelcome': 'Hello! I am Wise Baba. I will analyze your business idea and chosen location using a three-factor check. Let us begin: what business do you want to open and in which city?',
+      'navDashboard': 'Dashboard',
+      'navMap': 'Map',
+      'navAssistant': 'Assistant',
+      'navProfile': 'Profile',
+      'free': 'FREE',
+      'nextIdeaTitle':
+          'Choose your next location with Tochka.ai without unnecessary risk',
+      'nextIdeaSubtitle':
+          'Check your idea, budget and region, then compare the strongest 3 locations.',
+      'analysisStart': 'How should we start the analysis?',
+      'idea': 'Idea',
+      'place': 'Location',
+      'decision': 'Decision',
+      'deepAnalytics': 'Initial deep analytics',
+      'viabilityForecast': 'Viability forecast for the first year of operation',
+      'riskSimilarBusinesses': '6 similar businesses within a 500 m radius',
+      'riskVisibility': 'Check entrance visibility on site',
+      'unlockRisks': 'Unlock 2 critical risks and the full calculation',
+      'calculatorTitle': 'Break-even calculator',
+      'monthlyRent': 'Monthly rent (₸)',
+      'averageTicket': 'Average ticket (₸)',
+      'calculate': 'Calculate',
+      'customersNeeded':
+          'You need approximately {count} customers per day to break even.',
+      'plansTitle': 'Tochka.ai plans',
+      'planFreeSubtitle': 'Three-factor chat + map + location score',
+      'planOneSubtitle': 'Full analysis + PDF + negotiation text',
+      'planThreeSubtitle': 'Full analysis with side-by-side comparison',
+      'continue': 'Continue',
+      'searchAddressHint': 'Search city or address...',
+      'search': 'Search',
+      'addressNotFound': 'Address not found. Please be more specific.',
+      'locationIndex': 'Location index',
+      'footTraffic': 'Foot traffic',
+      'high': 'High',
+      'competitors': 'Competitors (500 m)',
+      'nearestDistance': 'Nearest competitor',
+      'analysisUnavailable': '2GIS analysis unavailable',
+      'analyzing': 'Analyzing...',
+      'locationPassport': 'PDF location passport',
+      'whatsappNegotiation': 'WhatsApp negotiation text',
+      'stopListening': 'Stop listening',
+      'voiceInput': 'Voice input',
+      'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
+      'languageEnglish': 'English',
+      'personaBaba': 'Wise Baba',
+      'personaBabaHint': 'Reduces risk',
+      'personaMarketer': 'Creative Marketer',
+      'personaMarketerHint': 'Helps you stand out',
+      'personaAnalyst': 'Strict Analyst',
+      'personaAnalystHint': 'Dry numbers and ROI',
+      'assistantWelcome':
+          'Hello! I am Wise Baba. I will analyze your business idea and chosen location using a three-factor check. Let us begin: what business do you want to open and in which city?',
     },
     'ru': {
       'appTitle': 'AI Бизнес Агент',
@@ -312,23 +384,59 @@ class AppLocalizations extends InheritedWidget {
       'openInMaps': 'Построить маршрут',
       'businessHotspot': 'Зона деловых возможностей',
       'noNotifications': 'Новых уведомлений нет',
-      'navDashboard': 'Панель', 'navMap': 'Карта', 'navAssistant': 'Ассистент', 'navProfile': 'Профиль',
-      'free': 'БЕСПЛАТНО', 'nextIdeaTitle': 'Выберите следующую локацию с Tochka.ai без лишнего риска',
-      'nextIdeaSubtitle': 'Проверьте идею, бюджет и регион, затем сравните 3 лучшие локации.',
-      'analysisStart': 'Как начнём анализ?', 'idea': 'Идея', 'place': 'Место', 'decision': 'Решение',
-      'deepAnalytics': 'Первичная глубокая аналитика', 'viabilityForecast': 'Прогноз жизнеспособности в первый год работы',
-      'riskSimilarBusinesses': '6 похожих бизнесов в радиусе 500 м', 'riskVisibility': 'Проверьте видимость входа на месте',
-      'unlockRisks': 'Открыть 2 критических риска и полный расчёт', 'calculatorTitle': 'Калькулятор окупаемости',
-      'monthlyRent': 'Аренда в месяц (₸)', 'averageTicket': 'Средний чек (₸)', 'calculate': 'Рассчитать',
-      'customersNeeded': 'Для выхода в прибыль нужно примерно {count} клиентов в день.', 'plansTitle': 'Тарифы Tochka.ai',
-      'planFreeSubtitle': 'Трёхфакторный чат + карта + оценка места', 'planOneSubtitle': 'Полный анализ + PDF + текст переговоров',
-      'planThreeSubtitle': 'Полный анализ со сравнением рядом', 'continue': 'Продолжить',
-      'searchAddressHint': 'Поиск города или адреса...', 'search': 'Поиск', 'addressNotFound': 'Адрес не найден. Уточните запрос.',
-      'locationIndex': 'Индекс места', 'footTraffic': 'Пешеходный трафик', 'high': 'Высокий', 'competitors': 'Конкуренты (500 м)', 'nearestDistance': 'Ближайший конкурент', 'analysisUnavailable': 'Анализ 2GIS недоступен', 'analyzing': 'Анализируется...',
-      'locationPassport': 'PDF-паспорт места', 'whatsappNegotiation': 'Текст переговоров в WhatsApp',
-      'stopListening': 'Остановить прослушивание', 'voiceInput': 'Голосовой ввод', 'smsEmailWhatsapp': 'SMS, Email, WhatsApp', 'languageEnglish': 'English',
-      'personaBaba': 'Мудрый Баба', 'personaBabaHint': 'Снижает риски', 'personaMarketer': 'Креативный маркетолог', 'personaMarketerHint': 'Помогает выделиться', 'personaAnalyst': 'Строгий аналитик', 'personaAnalystHint': 'Точные цифры и ROI',
-      'assistantWelcome': 'Здравствуйте! Я Мудрый Баба. Я проанализирую вашу бизнес-идею и выбранное место по трём факторам. Начнём: какой бизнес вы хотите открыть и в каком городе?',
+      'navDashboard': 'Панель',
+      'navMap': 'Карта',
+      'navAssistant': 'Ассистент',
+      'navProfile': 'Профиль',
+      'free': 'БЕСПЛАТНО',
+      'nextIdeaTitle':
+          'Выберите следующую локацию с Tochka.ai без лишнего риска',
+      'nextIdeaSubtitle':
+          'Проверьте идею, бюджет и регион, затем сравните 3 лучшие локации.',
+      'analysisStart': 'Как начнём анализ?',
+      'idea': 'Идея',
+      'place': 'Место',
+      'decision': 'Решение',
+      'deepAnalytics': 'Первичная глубокая аналитика',
+      'viabilityForecast': 'Прогноз жизнеспособности в первый год работы',
+      'riskSimilarBusinesses': '6 похожих бизнесов в радиусе 500 м',
+      'riskVisibility': 'Проверьте видимость входа на месте',
+      'unlockRisks': 'Открыть 2 критических риска и полный расчёт',
+      'calculatorTitle': 'Калькулятор окупаемости',
+      'monthlyRent': 'Аренда в месяц (₸)',
+      'averageTicket': 'Средний чек (₸)',
+      'calculate': 'Рассчитать',
+      'customersNeeded':
+          'Для выхода в прибыль нужно примерно {count} клиентов в день.',
+      'plansTitle': 'Тарифы Tochka.ai',
+      'planFreeSubtitle': 'Трёхфакторный чат + карта + оценка места',
+      'planOneSubtitle': 'Полный анализ + PDF + текст переговоров',
+      'planThreeSubtitle': 'Полный анализ со сравнением рядом',
+      'continue': 'Продолжить',
+      'searchAddressHint': 'Поиск города или адреса...',
+      'search': 'Поиск',
+      'addressNotFound': 'Адрес не найден. Уточните запрос.',
+      'locationIndex': 'Индекс места',
+      'footTraffic': 'Пешеходный трафик',
+      'high': 'Высокий',
+      'competitors': 'Конкуренты (500 м)',
+      'nearestDistance': 'Ближайший конкурент',
+      'analysisUnavailable': 'Анализ 2GIS недоступен',
+      'analyzing': 'Анализируется...',
+      'locationPassport': 'PDF-паспорт места',
+      'whatsappNegotiation': 'Текст переговоров в WhatsApp',
+      'stopListening': 'Остановить прослушивание',
+      'voiceInput': 'Голосовой ввод',
+      'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
+      'languageEnglish': 'English',
+      'personaBaba': 'Мудрый Баба',
+      'personaBabaHint': 'Снижает риски',
+      'personaMarketer': 'Креативный маркетолог',
+      'personaMarketerHint': 'Помогает выделиться',
+      'personaAnalyst': 'Строгий аналитик',
+      'personaAnalystHint': 'Точные цифры и ROI',
+      'assistantWelcome':
+          'Здравствуйте! Я Мудрый Баба. Я проанализирую вашу бизнес-идею и выбранное место по трём факторам. Начнём: какой бизнес вы хотите открыть и в каком городе?',
     },
     'kk': {
       'appTitle': 'AI Бизнес Агент',
@@ -404,23 +512,58 @@ class AppLocalizations extends InheritedWidget {
       'openInMaps': 'Бағыт алу',
       'businessHotspot': 'Бизнес мүмкіндігі аймағы',
       'noNotifications': 'Жаңа хабарландыру жоқ',
-      'navDashboard': 'Панель', 'navMap': 'Карта', 'navAssistant': 'Ассистент', 'navProfile': 'Профиль',
-      'free': 'ТЕГІН', 'nextIdeaTitle': 'Tochka.ai көмегімен келесі орынды тәуекелсіз таңдаңыз',
-      'nextIdeaSubtitle': 'Идеяңызды, бюджетіңізді және аймақты тексеріп, ең мықты 3 орынды салыстырыңыз.',
-      'analysisStart': 'Талдауды қалай бастаймыз?', 'idea': 'Идея', 'place': 'Орын', 'decision': 'Шешім',
-      'deepAnalytics': 'Алғашқы терең аналитика', 'viabilityForecast': 'Бірінші жұмыс жылына өміршеңдік болжамы',
-      'riskSimilarBusinesses': '500 м радиуста 6 ұқсас бизнес бар', 'riskVisibility': 'Кіреберіс көрінуін орнында тексеріңіз',
-      'unlockRisks': '2 маңызды тәуекел мен толық есептеуді ашу', 'calculatorTitle': 'Өтелімділік калькуляторы',
-      'monthlyRent': 'Айлық жалдау (₸)', 'averageTicket': 'Орташа чек (₸)', 'calculate': 'Есептеу',
-      'customersNeeded': 'Пайдаға шығу үшін күніне шамамен {count} клиент қажет.', 'plansTitle': 'Tochka.ai тарифтері',
-      'planFreeSubtitle': 'Үш факторлы чат + карта + орын бағасы', 'planOneSubtitle': 'Толық талдау + PDF + келіссөз мәтіні',
-      'planThreeSubtitle': 'Қатар салыстырумен толық талдау', 'continue': 'Жалғастыру',
-      'searchAddressHint': 'Қала немесе мекенжай іздеу...', 'search': 'Іздеу', 'addressNotFound': 'Мекенжай табылмады. Нақтырақ жазыңыз.',
-      'locationIndex': 'Орын индексі', 'footTraffic': 'Жаяу жүргінші трафигі', 'high': 'Жоғары', 'competitors': 'Бәсекелестер (500 м)', 'nearestDistance': 'Ең жақын бәсекелес', 'analysisUnavailable': '2GIS талдауы қолжетімсіз', 'analyzing': 'Талдануда...',
-      'locationPassport': 'PDF орын паспорты', 'whatsappNegotiation': 'WhatsApp келіссөз мәтіні',
-      'stopListening': 'Тыңдауды тоқтату', 'voiceInput': 'Дауыспен енгізу', 'smsEmailWhatsapp': 'SMS, Email, WhatsApp', 'languageEnglish': 'English',
-      'personaBaba': 'Дана Баба', 'personaBabaHint': 'Тәуекелді азайтады', 'personaMarketer': 'Креативті маркетолог', 'personaMarketerHint': 'Ерекшеленуге көмектеседі', 'personaAnalyst': 'Қатаң аналитик', 'personaAnalystHint': 'Нақты сандар және ROI',
-      'assistantWelcome': 'Сәлем! Мен Дана Бабамын. Бизнес идеяңыз бен таңдаған орныңызды үш фактор арқылы талдаймын. Бастайық: қай бизнесті қай қалада ашқыңыз келеді?',
+      'navDashboard': 'Панель',
+      'navMap': 'Карта',
+      'navAssistant': 'Ассистент',
+      'navProfile': 'Профиль',
+      'free': 'ТЕГІН',
+      'nextIdeaTitle': 'Tochka.ai көмегімен келесі орынды тәуекелсіз таңдаңыз',
+      'nextIdeaSubtitle':
+          'Идеяңызды, бюджетіңізді және аймақты тексеріп, ең мықты 3 орынды салыстырыңыз.',
+      'analysisStart': 'Талдауды қалай бастаймыз?',
+      'idea': 'Идея',
+      'place': 'Орын',
+      'decision': 'Шешім',
+      'deepAnalytics': 'Алғашқы терең аналитика',
+      'viabilityForecast': 'Бірінші жұмыс жылына өміршеңдік болжамы',
+      'riskSimilarBusinesses': '500 м радиуста 6 ұқсас бизнес бар',
+      'riskVisibility': 'Кіреберіс көрінуін орнында тексеріңіз',
+      'unlockRisks': '2 маңызды тәуекел мен толық есептеуді ашу',
+      'calculatorTitle': 'Өтелімділік калькуляторы',
+      'monthlyRent': 'Айлық жалдау (₸)',
+      'averageTicket': 'Орташа чек (₸)',
+      'calculate': 'Есептеу',
+      'customersNeeded':
+          'Пайдаға шығу үшін күніне шамамен {count} клиент қажет.',
+      'plansTitle': 'Tochka.ai тарифтері',
+      'planFreeSubtitle': 'Үш факторлы чат + карта + орын бағасы',
+      'planOneSubtitle': 'Толық талдау + PDF + келіссөз мәтіні',
+      'planThreeSubtitle': 'Қатар салыстырумен толық талдау',
+      'continue': 'Жалғастыру',
+      'searchAddressHint': 'Қала немесе мекенжай іздеу...',
+      'search': 'Іздеу',
+      'addressNotFound': 'Мекенжай табылмады. Нақтырақ жазыңыз.',
+      'locationIndex': 'Орын индексі',
+      'footTraffic': 'Жаяу жүргінші трафигі',
+      'high': 'Жоғары',
+      'competitors': 'Бәсекелестер (500 м)',
+      'nearestDistance': 'Ең жақын бәсекелес',
+      'analysisUnavailable': '2GIS талдауы қолжетімсіз',
+      'analyzing': 'Талдануда...',
+      'locationPassport': 'PDF орын паспорты',
+      'whatsappNegotiation': 'WhatsApp келіссөз мәтіні',
+      'stopListening': 'Тыңдауды тоқтату',
+      'voiceInput': 'Дауыспен енгізу',
+      'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
+      'languageEnglish': 'English',
+      'personaBaba': 'Дана Баба',
+      'personaBabaHint': 'Тәуекелді азайтады',
+      'personaMarketer': 'Креативті маркетолог',
+      'personaMarketerHint': 'Ерекшеленуге көмектеседі',
+      'personaAnalyst': 'Қатаң аналитик',
+      'personaAnalystHint': 'Нақты сандар және ROI',
+      'assistantWelcome':
+          'Сәлем! Мен Дана Бабамын. Бизнес идеяңыз бен таңдаған орныңызды үш фактор арқылы талдаймын. Бастайық: қай бизнесті қай қалада ашқыңыз келеді?',
     },
   };
 
@@ -682,9 +825,24 @@ class LocationAnalysisController extends ChangeNotifier {
   Future<void> analyzeFromPrompt(String prompt) async {
     final normalized = prompt.toLowerCase();
     const locationSignals = [
-      'məkan', 'ünvan', 'şəhər', 'biznes', 'kafe', 'restoran', 'rəqib', 'trafik',
-      'место', 'адрес', 'город', 'бизнес', 'кафе', 'конкурент', 'трафик',
-      'орын', 'қала', 'бәсекелес',
+      'məkan',
+      'ünvan',
+      'şəhər',
+      'biznes',
+      'kafe',
+      'restoran',
+      'rəqib',
+      'trafik',
+      'место',
+      'адрес',
+      'город',
+      'бизнес',
+      'кафе',
+      'конкурент',
+      'трафик',
+      'орын',
+      'қала',
+      'бәсекелес',
     ];
     if (!locationSignals.any(normalized.contains)) return;
 
@@ -722,9 +880,11 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   final LocationAnalysisController _locationController =
       LocationAnalysisController();
-  int _selectedIndex = 2;
+  int _selectedIndex = 0;
   bool _authenticated = false;
   bool _showNotifications = false;
+  int? _activeFlow;
+  String _auditAddress = '';
 
   final List<String> _notifications = const [
     'Yeni sınaq bildirişi: hesabınız uğurla yaradıldı.',
@@ -742,14 +902,30 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final navItems = [
-      _NavItem(icon: Icons.space_dashboard_outlined, selectedIcon: Icons.space_dashboard, label: loc.t('navDashboard')),
-      _NavItem(icon: Icons.map_outlined, selectedIcon: Icons.map, label: loc.t('navMap')),
-      _NavItem(icon: Icons.chat_bubble_outline, selectedIcon: Icons.chat_bubble, label: loc.t('navAssistant')),
-      _NavItem(icon: Icons.person_outline, selectedIcon: Icons.person, label: loc.t('navProfile')),
+      _NavItem(
+        icon: Icons.space_dashboard_outlined,
+        selectedIcon: Icons.space_dashboard,
+        label: loc.t('navDashboard'),
+      ),
+      _NavItem(
+        icon: Icons.map_outlined,
+        selectedIcon: Icons.map,
+        label: loc.t('navMap'),
+      ),
+      _NavItem(
+        icon: Icons.chat_bubble_outline,
+        selectedIcon: Icons.chat_bubble,
+        label: loc.t('navAssistant'),
+      ),
+      _NavItem(
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+        label: loc.t('navProfile'),
+      ),
     ];
 
     return Scaffold(
-      appBar: _authenticated
+      appBar: _authenticated && _activeFlow == null
           ? AppBar(
               title: Text(
                 AppLocalizations.translate(
@@ -794,16 +970,20 @@ class _HomeShellState extends State<HomeShell> {
             AuthScreen(
               onAuthenticated: () => setState(() {
                 _authenticated = true;
-                _selectedIndex = 2;
+                _selectedIndex = 0;
+                _activeFlow = null;
               }),
               onLocaleChanged: widget.onLocaleChanged,
               currentLocaleCode: widget.currentLocaleCode,
             ),
-          if (_authenticated)
+          if (_authenticated && _activeFlow == null)
             IndexedStack(
               index: _selectedIndex,
               children: [
-                DashboardScreen(),
+                ProductDashboardScreen(
+                  onOldPoint: () => setState(() => _activeFlow = 1),
+                  onNewPoint: () => setState(() => _activeFlow = 2),
+                ),
                 MapScreen(controller: _locationController),
                 ChatScreen(controller: _locationController),
                 ProfileScreen(
@@ -813,6 +993,29 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ],
             ),
+          if (_authenticated && _activeFlow == 1)
+            OldPointSurveyScreen(
+              onBack: () => setState(() => _activeFlow = null),
+              onAudit: _runAudit,
+            ),
+          if (_authenticated && _activeFlow == 2)
+            NewPointAssistantScreen(
+              onBack: () => setState(() => _activeFlow = null),
+              onMap: () => setState(() {
+                _activeFlow = null;
+                _selectedIndex = 1;
+              }),
+            ),
+          if (_authenticated && _activeFlow == 3)
+            AuditReportScreen(
+              analysis: _locationController.analysis,
+              address: _auditAddress,
+              onBack: () => setState(() => _activeFlow = 1),
+              onMap: () => setState(() {
+                _activeFlow = null;
+                _selectedIndex = 1;
+              }),
+            ),
           if (_showNotifications)
             _NotificationsOverlay(
               notifications: _notifications,
@@ -820,11 +1023,12 @@ class _HomeShellState extends State<HomeShell> {
             ),
         ],
       ),
-      bottomNavigationBar: _authenticated
+      bottomNavigationBar: _authenticated && _activeFlow == null
           ? NavigationBar(
               selectedIndex: _selectedIndex,
               onDestinationSelected: (index) => setState(() {
                 _selectedIndex = index;
+                _activeFlow = null;
                 _showNotifications = false;
               }),
               destinations: navItems
@@ -839,6 +1043,25 @@ class _HomeShellState extends State<HomeShell> {
             )
           : null,
     );
+  }
+
+  Future<Map<String, dynamic>?> _runAudit({
+    required String businessType,
+    required List<String> problems,
+    required String address,
+  }) async {
+    await _locationController.analyze(
+      city: address,
+      businessType:
+          '$businessType${problems.isEmpty ? '' : ' — ${problems.join(', ')}'}',
+      address: address,
+    );
+    if (!mounted) return _locationController.analysis;
+    setState(() {
+      _auditAddress = address;
+      _activeFlow = 3;
+    });
+    return _locationController.analysis;
   }
 }
 
@@ -1576,9 +1799,7 @@ class DashboardScreen extends StatelessWidget {
                       OutlinedButton.icon(
                         onPressed: () => _showPlans(context),
                         icon: const Icon(Icons.lock_open_outlined, size: 17),
-                        label: Text(
-                          loc.t('unlockRisks'),
-                        ),
+                        label: Text(loc.t('unlockRisks')),
                       ),
                     ],
                   ),
@@ -1932,7 +2153,9 @@ void _showRoiCalculator(BuildContext context) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  loc.t('customersNeeded').replaceFirst('{count}', '${((customers / 30).ceil())}'),
+                  loc
+                      .t('customersNeeded')
+                      .replaceFirst('{count}', '${((customers / 30).ceil())}'),
                 ),
               ),
             );
@@ -2069,7 +2292,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('analysisUnavailable'))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).t('analysisUnavailable')),
+        ),
       );
     }
   }
@@ -2113,7 +2338,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('addressNotFound'))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).t('addressNotFound')),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isSearching = false);
@@ -2170,26 +2397,37 @@ class _MapScreenState extends State<MapScreen> {
                   children: [
                     _Metric(
                       label: loc.t('locationIndex'),
-                        value: widget.controller.analysis?['score'] == null
+                      value: widget.controller.analysis?['score'] == null
                           ? '--'
                           : '${widget.controller.analysis!['score']}/100',
                       color: scheme.primary,
                     ),
                     _Metric(
                       label: loc.t('footTraffic'),
-                        value: widget.controller.isAnalyzing
+                      value: widget.controller.isAnalyzing
                           ? loc.t('analyzing')
-                          : (widget.controller.analysis?['pedestrian_traffic'] ?? '--').toString(),
+                          : (widget
+                                        .controller
+                                        .analysis?['pedestrian_traffic'] ??
+                                    '--')
+                                .toString(),
                       color: AppColors.secondary,
                     ),
                     _Metric(
                       label: loc.t('competitors'),
-                      value: (widget.controller.analysis?['competitors_500m'] ?? '--').toString(),
+                      value:
+                          (widget.controller.analysis?['competitors_500m'] ??
+                                  '--')
+                              .toString(),
                       color: const Color(0xFFF59E0B),
                     ),
                     _Metric(
                       label: loc.t('nearestDistance'),
-                        value: widget.controller.analysis?['nearest_competitor_meters'] == null
+                      value:
+                          widget
+                                  .controller
+                                  .analysis?['nearest_competitor_meters'] ==
+                              null
                           ? '--'
                           : '${widget.controller.analysis!['nearest_competitor_meters']} m',
                       color: scheme.primary,
@@ -2517,10 +2755,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final AiService _aiService = AiService();
   final List<_ChatMessage> _messages = [
-    const _ChatMessage(
-      author: 'assistant',
-      text: '',
-    ),
+    const _ChatMessage(author: 'assistant', text: ''),
   ];
   bool _isSending = false;
   final SpeechToText _speech = SpeechToText();
@@ -2828,7 +3063,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
-                    tooltip: _isListening
+                  tooltip: _isListening
                       ? loc.t('stopListening')
                       : loc.t('voiceInput'),
                   onPressed: _toggleListening,

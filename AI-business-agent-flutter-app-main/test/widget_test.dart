@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_business_agent/main.dart';
 
 void main() {
-  testWidgets('opens the assistant after guest access', (tester) async {
+  testWidgets('opens the dashboard after guest access', (tester) async {
     await tester.pumpWidget(const AiBusinessAgentApp());
 
     final guestButton = find.text('Qonaq kimi davam et');
@@ -19,7 +19,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI Business Agent'), findsWidgets);
-    expect(find.text('Assistant'), findsOneWidget);
-    expect(find.textContaining('Salam! Mən Müdrik Baba'), findsOneWidget);
+    expect(find.text('EAI Analytics'), findsOneWidget);
+    expect(find.textContaining('Köhnə nöqtəni'), findsOneWidget);
+    expect(find.textContaining('Yeni nöqtə'), findsOneWidget);
+    expect(find.text('Panel'), findsOneWidget);
   });
 }
