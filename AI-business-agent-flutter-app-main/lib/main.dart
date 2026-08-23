@@ -63,6 +63,19 @@ class AppLocalizations extends InheritedWidget {
       'register': 'Qeydiyyat',
       'emailOrUsername': 'E-poçt və ya istifadəçi adı',
       'emailAddress': 'E-poçt ünvanı',
+      'fullName': 'Ad və soyad',
+      'dateOfBirth': 'Doğum tarixi',
+      'selectDate': 'Tarix seçin',
+      'google': 'Google',
+      'apple': 'Apple',
+      'or': 'və ya',
+      'aiBackendError': 'Hazırda AI serverinə qoşulmaq mümkün olmadı.',
+      'liveReportTitle': 'Canlı 2GIS hesabatı:',
+      'liveLocationIndex': 'Məkan indeksi',
+      'liveTrafficIndex': 'Piyada trafik indeksi',
+      'liveCompetitors': '500 m-də rəqiblər',
+      'liveNearest': 'Ən yaxın rəqib',
+      'liveMapHint': 'Rəqiblərin nöqtələrini Xəritə panelində görə bilərsiniz.',
       'invalidEmail': 'Düzgün e-poçt ünvanı daxil edin.',
       'weakPassword': 'Şifrə ən azı 6 simvol olmalıdır.',
       'password': 'Şifrə',
@@ -188,6 +201,19 @@ class AppLocalizations extends InheritedWidget {
       'login': 'Log in',
       'register': 'Sign up',
       'emailAddress': 'Email address',
+      'fullName': 'Full name',
+      'dateOfBirth': 'Date of birth',
+      'selectDate': 'Select date',
+      'google': 'Google',
+      'apple': 'Apple',
+      'or': 'or',
+      'aiBackendError': 'The AI server could not be reached right now.',
+      'liveReportTitle': 'Live 2GIS report:',
+      'liveLocationIndex': 'Location index',
+      'liveTrafficIndex': 'Pedestrian traffic index',
+      'liveCompetitors': 'Competitors within 500 m',
+      'liveNearest': 'Nearest competitor',
+      'liveMapHint': 'You can see competitor points in the Map panel.',
       'password': 'Password',
       'invalidEmail': 'Enter a valid email address.',
       'weakPassword': 'Password must be at least 6 characters.',
@@ -315,6 +341,19 @@ class AppLocalizations extends InheritedWidget {
       'register': 'Регистрация',
       'emailOrUsername': 'Электронная почта или имя пользователя',
       'emailAddress': 'Электронная почта',
+      'fullName': 'Имя и фамилия',
+      'dateOfBirth': 'Дата рождения',
+      'selectDate': 'Выберите дату',
+      'google': 'Google',
+      'apple': 'Apple',
+      'or': 'или',
+      'aiBackendError': 'Не удалось подключиться к AI-серверу.',
+      'liveReportTitle': 'Живой отчёт 2GIS:',
+      'liveLocationIndex': 'Индекс места',
+      'liveTrafficIndex': 'Индекс пешеходного трафика',
+      'liveCompetitors': 'Конкуренты в радиусе 500 м',
+      'liveNearest': 'Ближайший конкурент',
+      'liveMapHint': 'Точки конкурентов можно увидеть на вкладке «Карта».',
       'invalidEmail': 'Введите корректный адрес электронной почты.',
       'weakPassword': 'Пароль должен содержать минимум 6 символов.',
       'password': 'Пароль',
@@ -445,6 +484,19 @@ class AppLocalizations extends InheritedWidget {
       'register': 'Тіркелу',
       'emailOrUsername': 'Электрондық пошта немесе пайдаланушы аты',
       'emailAddress': 'Электрондық пошта',
+      'fullName': 'Аты-жөні',
+      'dateOfBirth': 'Туған күні',
+      'selectDate': 'Күнді таңдаңыз',
+      'google': 'Google',
+      'apple': 'Apple',
+      'or': 'немесе',
+      'aiBackendError': 'Қазір AI серверіне қосылу мүмкін болмады.',
+      'liveReportTitle': 'Нақты 2GIS есебі:',
+      'liveLocationIndex': 'Орын индексі',
+      'liveTrafficIndex': 'Жаяу жүргінші ағынының индексі',
+      'liveCompetitors': '500 м ішіндегі бәсекелестер',
+      'liveNearest': 'Ең жақын бәсекелес',
+      'liveMapHint': 'Бәсекелестер нүктелерін Карта панелінен көре аласыз.',
       'invalidEmail': 'Дұрыс электрондық пошта енгізіңіз.',
       'weakPassword': 'Құпия сөз кемінде 6 таңбадан тұруы керек.',
       'password': 'Құпия сөз',
@@ -984,6 +1036,7 @@ class _HomeShellState extends State<HomeShell> {
               index: _selectedIndex,
               children: [
                 ProductDashboardScreen(
+                  localeCode: widget.currentLocaleCode,
                   onOldPoint: () => setState(() => _activeFlow = 1),
                   onNewPoint: () => setState(() => _activeFlow = 2),
                 ),
@@ -999,11 +1052,13 @@ class _HomeShellState extends State<HomeShell> {
             ),
           if (_authenticated && _activeFlow == 1)
             OldPointSurveyScreen(
+              localeCode: widget.currentLocaleCode,
               onBack: () => setState(() => _activeFlow = null),
               onAudit: _runAudit,
             ),
           if (_authenticated && _activeFlow == 2)
             NewPointAssistantScreen(
+              localeCode: widget.currentLocaleCode,
               onBack: () => setState(() => _activeFlow = null),
               onAnalyze: _runChatLocationAnalysis,
               onMap: () => setState(() {
@@ -1013,6 +1068,7 @@ class _HomeShellState extends State<HomeShell> {
             ),
           if (_authenticated && _activeFlow == 3)
             AuditReportScreen(
+              localeCode: widget.currentLocaleCode,
               analysis: _locationController.analysis,
               address: _auditAddress,
               onBack: () => setState(() => _activeFlow = 1),
@@ -1318,7 +1374,7 @@ class _AuthScreenState extends State<AuthScreen> {
       initialDate: _dateOfBirth ?? DateTime(now.year - 25, now.month, now.day),
       firstDate: DateTime(1900),
       lastDate: DateTime(now.year - 13, now.month, now.day),
-      helpText: 'Doğum tarixini seçin',
+      helpText: AppLocalizations.of(context).t('dateOfBirth'),
     );
     if (selected != null) setState(() => _dateOfBirth = selected);
   }
@@ -1437,7 +1493,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? null
                                       : () => _socialSignIn(apple: false),
                                   icon: const Icon(Icons.g_mobiledata),
-                                  label: const Text('Google'),
+                                  label: Text(loc.t('google')),
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.sm),
@@ -1447,7 +1503,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? null
                                       : () => _socialSignIn(apple: true),
                                   icon: const Icon(Icons.apple),
-                                  label: const Text('Apple'),
+                                  label: Text(loc.t('apple')),
                                 ),
                               ),
                             ],
@@ -1459,7 +1515,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 child: Text(
-                                  'və ya',
+                                  loc.t('or'),
                                   style: TextStyle(color: scheme.outline),
                                 ),
                               ),
@@ -1471,8 +1527,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             TextField(
                               controller: _nameCtrl,
                               textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Ad və soyad',
+                              decoration: InputDecoration(
+                                labelText: loc.t('fullName'),
                                 prefixIcon: Icon(Icons.person_outline),
                               ),
                             ),
@@ -1491,13 +1547,13 @@ class _AuthScreenState extends State<AuthScreen> {
                               onTap: _isLoading ? null : _selectDateOfBirth,
                               borderRadius: BorderRadius.circular(AppRadius.sm),
                               child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Doğum tarixi',
+                                decoration: InputDecoration(
+                                  labelText: loc.t('dateOfBirth'),
                                   prefixIcon: Icon(Icons.cake_outlined),
                                 ),
                                 child: Text(
                                   _dateOfBirth == null
-                                      ? 'Tarix seçin'
+                                      ? loc.t('selectDate')
                                       : '${_dateOfBirth!.day.toString().padLeft(2, '0')}.${_dateOfBirth!.month.toString().padLeft(2, '0')}.${_dateOfBirth!.year}',
                                   style: TextStyle(
                                     color: _dateOfBirth == null
@@ -3022,9 +3078,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add(
-          const _ChatMessage(
+          _ChatMessage(
             author: 'assistant',
-            text: 'Sorry, I could not reach the AI backend right now.',
+            text: AppLocalizations.of(context).t('aiBackendError'),
           ),
         );
         _isSending = false;
@@ -3034,16 +3090,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _formatLiveAnalysis(Map<String, dynamic> analysis) {
+    final loc = AppLocalizations.of(context);
     final score = analysis['score']?.toString() ?? '—';
     final traffic = analysis['pedestrian_traffic']?.toString() ?? '—';
     final competitors = analysis['competitors_500m']?.toString() ?? '—';
     final nearest = analysis['nearest_competitor_meters']?.toString() ?? '—';
-    return 'Canlı 2GIS hesabatı:\n'
-        '• Məkan indeksi: $score/100\n'
-        '• Piyada trafik indeksi: $traffic/100\n'
-        '• 500 m-də rəqiblər: $competitors\n'
-        '• Ən yaxın rəqib: $nearest m\n\n'
-        'Rəqiblərin nöqtələrini Xəritə panelində görə bilərsiniz.';
+    return '${loc.t('liveReportTitle')}\n'
+        '• ${loc.t('liveLocationIndex')}: $score/100\n'
+        '• ${loc.t('liveTrafficIndex')}: $traffic/100\n'
+        '• ${loc.t('liveCompetitors')}: $competitors\n'
+        '• ${loc.t('liveNearest')}: $nearest m\n\n'
+        '${loc.t('liveMapHint')}';
   }
 
   Future<void> _toggleListening() async {
@@ -3379,7 +3436,7 @@ class ProfileScreen extends StatelessWidget {
                   _SettingsRow(
                     icon: Icons.cake_outlined,
                     color: const Color(0xFFF59E0B),
-                    title: 'Doğum tarixi',
+                    title: loc.t('dateOfBirth'),
                     subtitle: dateOfBirth,
                   ),
                 ],

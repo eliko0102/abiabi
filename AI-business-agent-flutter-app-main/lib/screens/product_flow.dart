@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/ai_service.dart';
+import 'flow_localizations.dart';
 
 const _accent = Color(0xFF8E44FF);
 const _success = Color(0xFF30D158);
@@ -17,14 +18,17 @@ class ProductDashboardScreen extends StatelessWidget {
     super.key,
     required this.onOldPoint,
     required this.onNewPoint,
+    required this.localeCode,
   });
 
   final VoidCallback onOldPoint;
   final VoidCallback onNewPoint;
+  final String localeCode;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final t = (String key) => FlowLocalizations.t(localeCode, key);
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(
@@ -56,7 +60,7 @@ class ProductDashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Biznes nöqtənizi təhlil edin və daha yaxşı qərar verin.',
+                  t('dashboardSubtitle'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: scheme.outline, height: 1.4),
                 ),
@@ -67,8 +71,8 @@ class ProductDashboardScreen extends StatelessWidget {
                     Expanded(
                       child: _DashboardActionCard(
                         icon: Icons.storefront_outlined,
-                        title: 'Köhnə nöqtəni\ninkişaf etdirmək',
-                        subtitle: 'Mövcud biznes üçün audit',
+                        title: t('oldPoint'),
+                        subtitle: t('oldPointSubtitle'),
                         onTap: onOldPoint,
                       ),
                     ),
@@ -76,8 +80,8 @@ class ProductDashboardScreen extends StatelessWidget {
                     Expanded(
                       child: _DashboardActionCard(
                         icon: Icons.explore_outlined,
-                        title: 'Yeni nöqtə\ntapmaq',
-                        subtitle: 'Yeni zona və məkan seçimi',
+                        title: t('newPoint'),
+                        subtitle: t('newPointSubtitle'),
                         onTap: onNewPoint,
                       ),
                     ),
@@ -85,7 +89,7 @@ class ProductDashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Pulsuz minimum audit • Xəritədə zona analizi • AI assistent',
+                  t('dashboardFooter'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: scheme.outline, fontSize: 12),
                 ),
@@ -162,10 +166,12 @@ class OldPointSurveyScreen extends StatefulWidget {
     super.key,
     required this.onBack,
     required this.onAudit,
+    required this.localeCode,
   });
 
   final VoidCallback onBack;
   final AuditCallback onAudit;
+  final String localeCode;
 
   @override
   State<OldPointSurveyScreen> createState() => _OldPointSurveyScreenState();
@@ -176,21 +182,12 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
   final _otherBusinessController = TextEditingController();
   final _otherProblemController = TextEditingController();
   final _businesses = const [
-    'İctimai iaşə',
-    'Məhsullar / Pərakəndə',
-    'Gözəllik',
-    'Təbabət',
-    'Avtoservis',
-    'Qonaq evi',
-    'Mehmanxana',
-    'Təhsil',
+    'business_food', 'business_retail', 'business_beauty', 'business_health',
+    'business_auto', 'business_guesthouse', 'business_hotel', 'business_education',
   ];
   final _problems = const [
-    'Piyada trafiki aşağı düşüb',
-    'Rəqiblər açılıb',
-    'Orta çeki qaldırmaq istəyirəm',
-    'Müştəri axını azdır',
-    'Görünürlük zəifdir',
+    'problem_traffic', 'problem_competitors', 'problem_ticket',
+    'problem_customers', 'problem_visibility',
   ];
   final Set<String> _selectedBusinesses = {};
   final Set<String> _selectedProblems = {};
@@ -212,12 +209,16 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
     }
     setState(() => _isLoading = true);
     final business = [
-      ..._selectedBusinesses,
+      ..._selectedBusinesses.map(
+        (id) => FlowLocalizations.t(widget.localeCode, id),
+      ),
       if (_otherBusinessController.text.trim().isNotEmpty)
         _otherBusinessController.text.trim(),
     ].join(', ');
     final problems = [
-      ..._selectedProblems,
+      ..._selectedProblems.map(
+        (id) => FlowLocalizations.t(widget.localeCode, id),
+      ),
       if (_otherProblemController.text.trim().isNotEmpty)
         _otherProblemController.text.trim(),
     ];
@@ -231,7 +232,13 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Audit baş tutmadı: $error')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${FlowLocalizations.t(widget.localeCode, 'auditFailed')}: $error',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -241,6 +248,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final t = (String key) => FlowLocalizations.t(widget.localeCode, key);
     final canAudit =
         _selectedBusinesses.isNotEmpty &&
         _addressController.text.trim().isNotEmpty;
@@ -257,38 +265,39 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                   const SizedBox(width: 4),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Köhnə nöqtəni inkişaf etdir',
+                      t('oldPointHeader'),
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 19,
                       ),
                     ),
                   ),
-                  const _FreeBadge(),
+                  _FreeBadge(localeCode: widget.localeCode),
                 ],
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: _SectionTitle(
-              title: '1. Biznes sahəsi',
-              subtitle: 'Bir və ya bir neçə sahə seçin',
+              title: t('businessSection'),
+              subtitle: t('businessSectionSubtitle'),
             ),
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverGrid(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final label = _businesses[index];
+                final id = _businesses[index];
+                final label = t(id);
                 return _ToggleTile(
                   label: label,
-                  icon: _businessIcon(label),
-                  selected: _selectedBusinesses.contains(label),
+                  icon: _businessIcon(id),
+                  selected: _selectedBusinesses.contains(id),
                   onTap: () => setState(() {
-                    if (!_selectedBusinesses.add(label)) {
-                      _selectedBusinesses.remove(label);
+                    if (!_selectedBusinesses.add(id)) {
+                      _selectedBusinesses.remove(id);
                     }
                   }),
                 );
@@ -305,41 +314,41 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: _OtherInputTile(
-                label: 'Digər sahə...',
+                label: t('otherBusiness'),
                 active: _otherBusiness,
                 controller: _otherBusinessController,
-                suggestions: const [
-                  'Qonaq evi',
-                  'Mehmanxana',
-                  'Avtoservis',
-                  'Logistika',
-                  'Xidmət',
+                suggestions: [
+                  t('business_guesthouse'), t('business_hotel'),
+                  t('business_auto'), t('business_logistics'), t('business_service'),
                 ],
+                closeLabel: t('close'),
+                hintText: t('autocompleteHint'),
                 onTap: () => setState(() => _otherBusiness = !_otherBusiness),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: _SectionTitle(
-              title: '2. Əsas problem',
-              subtitle: 'Maksimum iki variant seçə bilərsiniz',
+              title: t('problemSection'),
+              subtitle: t('problemSectionSubtitle'),
             ),
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverGrid(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final label = _problems[index];
-                final selected = _selectedProblems.contains(label);
+                final id = _problems[index];
+                final label = t(id);
+                final selected = _selectedProblems.contains(id);
                 return _ToggleTile(
                   label: label,
                   icon: Icons.insights_outlined,
                   selected: selected,
                   onTap: () => setState(() {
                     if (selected) {
-                      _selectedProblems.remove(label);
+                      _selectedProblems.remove(id);
                     } else if (_selectedProblems.length < 2) {
-                      _selectedProblems.add(label);
+                      _selectedProblems.add(id);
                     }
                   }),
                 );
@@ -356,17 +365,19 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: _OtherInputTile(
-                label: 'Digər problem...',
+                label: t('otherProblem'),
                 active: _otherProblem,
                 controller: _otherProblemController,
+                closeLabel: t('close'),
+                hintText: t('autocompleteHint'),
                 onTap: () => setState(() => _otherProblem = !_otherProblem),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: _SectionTitle(
-              title: '3. Ünvan',
-              subtitle: 'Nöqtənin ünvanını daxil edin',
+              title: t('addressSection'),
+              subtitle: t('addressSectionSubtitle'),
             ),
           ),
           SliverToBoxAdapter(
@@ -375,9 +386,9 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
               child: TextField(
                 controller: _addressController,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   prefixIcon: Icon(Icons.location_on_outlined),
-                  hintText: 'Şəhər, küçə və ya ünvan',
+                  hintText: t('addressHint'),
                   suffixIcon: Icon(Icons.map_outlined),
                 ),
               ),
@@ -399,7 +410,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
                       )
                     : const Icon(Icons.auto_awesome),
                 label: Text(
-                  _isLoading ? 'Audit hazırlanır...' : 'AUDİTƏ BAŞLA →',
+                  _isLoading ? t('auditLoading') : t('auditStart'),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: _accent,
@@ -412,7 +423,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
             child: Padding(
               padding: const EdgeInsets.only(bottom: 30),
               child: Text(
-                'Pulsuz versiya minimum hesabat və əsas zona göstəricilərini əhatə edir.',
+                t('freeAuditNote'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: scheme.outline, fontSize: 12),
               ),
@@ -424,12 +435,12 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
   }
 
   IconData _businessIcon(String label) {
-    if (label.contains('iaşə')) return Icons.restaurant_outlined;
-    if (label.contains('Məhsul')) return Icons.shopping_bag_outlined;
-    if (label.contains('Gözəllik')) return Icons.face_retouching_natural;
-    if (label.contains('Təbabət')) return Icons.medical_services_outlined;
-    if (label.contains('Avto')) return Icons.directions_car_outlined;
-    if (label.contains('otel') || label.contains('Qonaq')) {
+    if (label == 'business_food') return Icons.restaurant_outlined;
+    if (label == 'business_retail') return Icons.shopping_bag_outlined;
+    if (label == 'business_beauty') return Icons.face_retouching_natural;
+    if (label == 'business_health') return Icons.medical_services_outlined;
+    if (label == 'business_auto') return Icons.directions_car_outlined;
+    if (label == 'business_hotel' || label == 'business_guesthouse') {
       return Icons.hotel_outlined;
     }
     return Icons.business_outlined;
@@ -443,16 +454,19 @@ class AuditReportScreen extends StatelessWidget {
     required this.address,
     required this.onBack,
     required this.onMap,
+    required this.localeCode,
   });
 
   final Map<String, dynamic>? analysis;
   final String address;
   final VoidCallback onBack;
   final VoidCallback onMap;
+  final String localeCode;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final t = (String key) => FlowLocalizations.t(localeCode, key);
     final score = analysis?['score']?.toString() ?? '—';
     final traffic = analysis?['pedestrian_traffic'] == null
         ? '—'
@@ -465,9 +479,9 @@ class AuditReportScreen extends StatelessWidget {
           Row(
             children: [
               IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back)),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Minimum hesabat',
+                  t('reportTitle'),
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
               ),
@@ -482,8 +496,8 @@ class AuditReportScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.check_circle, color: _success, size: 42),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Audit hazırdır',
+                  Text(
+                    t('auditReady'),
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 6),
@@ -492,17 +506,17 @@ class AuditReportScreen extends StatelessWidget {
                   Row(
                     children: [
                       _ReportMetric(
-                        label: 'Keçid balı',
+                        label: t('score'),
                         value: score,
                         color: _accent,
                       ),
                       _ReportMetric(
-                        label: 'Piyada trafiki',
+                        label: t('traffic'),
                         value: traffic,
                         color: _success,
                       ),
                       _ReportMetric(
-                        label: 'Rəqiblər',
+                        label: t('competitors'),
                         value: competitors,
                         color: Colors.orange,
                       ),
@@ -514,14 +528,14 @@ class AuditReportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Daha ətraflı baxış üçün nəticəni xəritədə açın. Rəqibləri, nöqtələri və keçid balını vizual müqayisə edin.',
+            t('reportDescription'),
             style: TextStyle(color: scheme.outline, height: 1.45),
           ),
           const SizedBox(height: 22),
           FilledButton.icon(
             onPressed: onMap,
             icon: const Icon(Icons.map_outlined),
-            label: const Text('XƏRİTƏDƏ BAX'),
+            label: Text(t('viewMap')),
             style: FilledButton.styleFrom(
               backgroundColor: _accent,
               minimumSize: const Size.fromHeight(54),
@@ -531,7 +545,7 @@ class AuditReportScreen extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => _showUpgrade(context),
             icon: const Icon(Icons.lock_open_outlined),
-            label: const Text('Tam hesabatı aç'),
+            label: Text(t('fullReport')),
           ),
         ],
       ),
@@ -542,10 +556,10 @@ class AuditReportScreen extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => const Padding(
+      builder: (context) => Padding(
         padding: EdgeInsets.all(24),
         child: Text(
-          'Ödənişli versiyada rəqib xəritəsi, tam hesabat və tövsiyələr açılır.',
+          FlowLocalizations.t(localeCode, 'paidUpgrade'),
           style: TextStyle(fontSize: 16, height: 1.4),
         ),
       ),
@@ -595,10 +609,12 @@ class NewPointAssistantScreen extends StatefulWidget {
     required this.onBack,
     required this.onMap,
     required this.onAnalyze,
+    required this.localeCode,
   });
   final VoidCallback onBack;
   final VoidCallback onMap;
   final Future<void> Function(String businessType, String address) onAnalyze;
+  final String localeCode;
 
   @override
   State<NewPointAssistantScreen> createState() =>
@@ -609,17 +625,23 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _ai = AiService();
-  final List<_FlowMessage> _messages = [
-    const _FlowMessage(
-      'assistant',
-      'Salam! Yeni biznes nöqtəsi tapmaqda sizə kömək edəcəyəm. Haradan başlayaq?',
-      actions: ['Sıfırdan axtarmaq', 'Öz ünvanım var'],
-    ),
-  ];
+  late List<_FlowMessage> _messages;
   String? _mode;
   String? _business;
   String? _address;
   bool _loading = false;
+
+  String _t(String key) => FlowLocalizations.t(widget.localeCode, key);
+
+  @override
+  void initState() {
+    super.initState();
+    _messages = [
+      _FlowMessage('assistant', _t('assistantWelcome'), actions: const [
+        'startNew', 'ownAddress',
+      ]),
+    ];
+  }
 
   @override
   void dispose() {
@@ -642,36 +664,32 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
   }
 
   Future<void> _choose(String value) async {
-    _add('user', value);
-    if (value == 'Sıfırdan axtarmaq') {
+    _add('user', _t(value));
+    if (value == 'startNew') {
       _mode = 'new';
       _add(
         'assistant',
-        'Əla. Hansı biznes sahəsi üçün zona axtarırsınız?',
+        _t('chooseBusiness'),
         actions: const [
-          'İctimai iaşə',
-          'Məhsullar / Pərakəndə',
-          'Gözəllik',
-          'Təbabət',
-          'Avtoservis',
-          'Digər',
+          'business_food', 'business_retail', 'business_beauty',
+          'business_health', 'business_auto', 'otherBusiness',
         ],
       );
-    } else if (value == 'Öz ünvanım var') {
+    } else if (value == 'ownAddress') {
       _mode = 'address';
       _add(
         'assistant',
-        'Ünvanı yazın. Sonra həmin nöqtənin ətrafını və rəqibləri xəritədə göstərəcəyəm.',
+        _t('writeAddress'),
       );
     } else if (_mode == 'new' && _business == null) {
       _business = value;
-      _add('assistant', 'İndi şəhər və ya axtarılacaq ərazini yazın.');
+      _add('assistant', _t('writeArea'));
     } else if (_mode == 'address' && _address != null && _business == null) {
       _business = value;
       await _finishFlow();
     } else if (_business == null) {
       _business = value;
-      _add('assistant', 'Ünvanı və ya şəhəri yazın.');
+      _add('assistant', _t('writeAddressOrCity'));
     } else {
       _address = value;
       await _finishFlow();
@@ -682,18 +700,18 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     if (_business == null || _address == null) return;
     setState(() => _loading = true);
     try {
-      await widget.onAnalyze(_business!, _address!);
+      await widget.onAnalyze(_t(_business!), _address!);
       if (!mounted) return;
       setState(() => _loading = false);
       _add(
         'assistant',
-        'Canlı 2GIS analizi hazırdır. Zonalara xəritədə baxa və rəqibləri müqayisə edə bilərsiniz.',
-        actions: const ['ZONALARA XƏRİTƏDƏ BAX'],
+        _t('analysisReady'),
+        actions: const ['mapZones'],
       );
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _add('assistant', '2GIS analizi alınmadı: $error');
+      _add('assistant', '${_t('analysisFailed')}: $error');
     }
   }
 
@@ -706,13 +724,10 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       _address = text;
       _add(
         'assistant',
-        'Bu nöqtə üçün biznes sahəsini seçin.',
+        _t('selectBusiness'),
         actions: const [
-          'İctimai iaşə',
-          'Məhsullar / Pərakəndə',
-          'Gözəllik',
-          'Təbabət',
-          'Avtoservis',
+          'business_food', 'business_retail', 'business_beauty',
+          'business_health', 'business_auto',
         ],
       );
       return;
@@ -747,19 +762,19 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                   child: Icon(Icons.smart_toy_outlined, color: _accent),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AI Assistent',
+                        _t('assistantTitle'),
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
                         ),
                       ),
                       Text(
-                        'Yeni nöqtə seçimi',
+                        _t('assistantSubtitle'),
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
@@ -820,14 +835,14 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                               children: message.actions
                                   .map(
                                     (action) => OutlinedButton(
-                                      onPressed: action.startsWith('ZONALAR')
+                                      onPressed: action == 'mapZones'
                                           ? widget.onMap
                                           : () => _choose(action),
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: _accent,
                                         side: const BorderSide(color: _accent),
                                       ),
-                                      child: Text(action),
+                                      child: Text(_t(action)),
                                     ),
                                   )
                                   .toList(),
@@ -853,8 +868,8 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                   child: TextField(
                     controller: _inputController,
                     onSubmitted: (_) => _send(),
-                    decoration: const InputDecoration(
-                      hintText: 'Mesajınızı yazın...',
+                    decoration: InputDecoration(
+                      hintText: _t('chatHint'),
                     ),
                   ),
                 ),
@@ -911,7 +926,8 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _FreeBadge extends StatelessWidget {
-  const _FreeBadge();
+  const _FreeBadge({required this.localeCode});
+  final String localeCode;
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -919,8 +935,8 @@ class _FreeBadge extends StatelessWidget {
       color: _success.withValues(alpha: .14),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: const Text(
-      'Pulsuz',
+    child: Text(
+      FlowLocalizations.t(localeCode, 'free'),
       style: TextStyle(
         color: _success,
         fontWeight: FontWeight.w700,
@@ -991,12 +1007,16 @@ class _OtherInputTile extends StatelessWidget {
     required this.active,
     required this.controller,
     required this.onTap,
+    required this.closeLabel,
+    required this.hintText,
     this.suggestions = const [],
   });
   final String label;
   final bool active;
   final TextEditingController controller;
   final VoidCallback onTap;
+  final String closeLabel;
+  final String hintText;
   final List<String> suggestions;
   @override
   Widget build(BuildContext context) => Column(
@@ -1004,7 +1024,7 @@ class _OtherInputTile extends StatelessWidget {
       OutlinedButton.icon(
         onPressed: onTap,
         icon: Icon(active ? Icons.close : Icons.add),
-        label: Text(active ? 'Bağla' : label),
+        label: Text(active ? closeLabel : label),
         style: OutlinedButton.styleFrom(
           foregroundColor: _accent,
           side: const BorderSide(color: _accent),
@@ -1031,9 +1051,9 @@ class _OtherInputTile extends StatelessWidget {
                     controller: textController,
                     focusNode: focusNode,
                     onChanged: (value) => controller.text = value,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       prefixIcon: Icon(Icons.search),
-                      hintText: 'İlk 3 hərfi yazın...',
+                      hintText: hintText,
                     ),
                   );
                 },
