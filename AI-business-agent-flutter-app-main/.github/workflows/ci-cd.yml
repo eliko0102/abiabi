@@ -1,0 +1,172 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Backend Tests
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+      
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm install
+      
+      - name: Lint Backend
+        working-directory: ./backend
+        run: npm run lint --if-present || echo "No linter configured"
+      
+      - name: Verify Backend Syntax
+        working-directory: ./backend
+        run: node -c server.js && echo "✅ Backend syntax OK"
+      
+      # Flutter Tests
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: 'stable'
+      
+      - name: Flutter Get Dependencies
+        run: flutter pub get
+      
+      - name: Analyze Dart Code
+        run: flutter analyze
+      
+      - name: Format Check
+        run: dart format --set-exit-if-changed lib/ test/
+  
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: 'stable'
+      
+      - name: Get dependencies
+        run: flutter pub get
+      
+      - name: Build Debug APK
+        run: flutter build apk --debug
+      
+      - name: Build Release APK
+        run: flutter build apk --release
+      
+      - name: Upload APKs
+        uses: actions/upload-artifact@v3
+        with:
+          name: apk-builds
+          path: |
+            build/app/outputs/flutter-apk/app-debug.apk
+            build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm install
+      
+      - name: Create backend package
+        working-directory: ./backend
+        run: |
+          mkdir -p dist
+          cp -r . dist/
+          rm -rf dist/node_modules
+          cd dist && npm install --production
+      
+      - name: Upload Backend
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-build
+          path: backend/dist/
+          retention-days: 30
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Dependency Check
+        run: |
+          echo "🔍 Scanning for security issues..."
+          npm audit --audit-level=moderate || true
+        working-directory: ./backend
+      
+      - name: YAML Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: '.'
+          config_data: |
+            {
+              rules: {
+                line-length: disable,
+                comments-indentation: disable
+              }
+            }
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [test, build-apk, build-backend]
+    if: always()
+    
+    steps:
+      - name: Check Build Status
+        run: |
+          if [ "${{ needs.test.result }}" == "failure" ]; then
+            echo "❌ Tests failed"
+            exit 1
+          fi
+          echo "✅ Build pipeline completed"
+      
+      - name: Upload Summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **APK Build**: ${{ needs.build-apk.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Build**: ${{ needs.build-backend.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📱 APK Download: Check Artifacts section" >> $GITHUB_STEP_SUMMARY

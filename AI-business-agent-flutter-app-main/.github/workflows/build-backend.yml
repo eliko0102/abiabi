@@ -1,0 +1,62 @@
+name: Build Backend
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-backend.yml'
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm install
+      
+      - name: Run linter
+        working-directory: ./backend
+        run: npm run lint --if-present
+      
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test --if-present
+      
+      - name: Check syntax
+        working-directory: ./backend
+        run: node -c server.js
+      
+      - name: Create artifact
+        working-directory: ./backend
+        run: |
+          mkdir -p artifacts
+          cp server.js artifacts/
+          cp package*.json artifacts/
+          cp -r routes/ artifacts/
+          cp -r models/ artifacts/
+          cp -r middleware/ artifacts/
+          cp .env.example artifacts/.env.example || true
+      
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-build-node${{ matrix.node-version }}
+          path: backend/artifacts/
+          retention-days: 30

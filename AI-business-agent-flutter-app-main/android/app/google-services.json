@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "896711890771",
+    "project_id": "ai-agent-app-be146",
+    "storage_bucket": "ai-agent-app-be146.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:896711890771:android:a742e5baf61ab6026973a6",
+        "android_client_info": {
+          "package_name": "com.aiagent.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "replace_with_firebase_web_api_key"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
