@@ -205,6 +205,13 @@ async function analyzeGoogleLocation({ address, city, businessType }) {
     review_count: item.user_ratings_total ?? 0,
     rubrics: item.types || [],
     schedule: item.opening_hours || null,
+    business_status: item.business_status || null,
+    price_level: item.price_level ?? null,
+    website: item.website || null,
+    phone: item.international_phone_number || item.formatted_phone_number || null,
+    google_maps_url: item.url || null,
+    editorial_summary: item.editorial_summary?.overview || null,
+    address_components: item.address_components || [],
     comments: [],
   })).filter((item) => Number.isFinite(item.point.lat) && Number.isFinite(item.point.lon));
   await Promise.all(competitors.slice(0, 20).map(async (item) => {
@@ -213,7 +220,7 @@ async function analyzeGoogleLocation({ address, city, businessType }) {
       const details = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
         params: {
           place_id: item.id,
-          fields: 'opening_hours,reviews,user_ratings_total,rating,formatted_address,name,geometry',
+          fields: 'opening_hours,reviews,user_ratings_total,rating,formatted_address,name,geometry,business_status,price_level,types,url,website,international_phone_number,formatted_phone_number,address_components,editorial_summary',
           key,
           language: 'az',
         },
@@ -224,6 +231,13 @@ async function analyzeGoogleLocation({ address, city, businessType }) {
       item.schedule = result.opening_hours || item.schedule;
       item.rating = result.rating ?? item.rating;
       item.review_count = result.user_ratings_total ?? item.review_count;
+      item.business_status = result.business_status || item.business_status;
+      item.price_level = result.price_level ?? item.price_level;
+      item.website = result.website || item.website;
+      item.phone = result.international_phone_number || result.formatted_phone_number || item.phone;
+      item.google_maps_url = result.url || item.google_maps_url;
+      item.editorial_summary = result.editorial_summary?.overview || item.editorial_summary;
+      item.address_components = result.address_components || item.address_components;
       item.comments = (result.reviews || []).slice(0, 3).map((review) => ({
         text: review.text || null,
         rating: review.rating ?? null,

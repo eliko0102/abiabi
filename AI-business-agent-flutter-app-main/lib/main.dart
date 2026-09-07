@@ -93,6 +93,8 @@ class AppLocalizations extends InheritedWidget {
       'logout': 'Hesabdan çıxış',
       'logoutConfirm': 'Hesabdan çıxmaq istəyirsiniz?',
       'cancel': 'Ləğv et',
+      'deleteAudit': 'Auditi sil',
+      'deleteAuditConfirm': 'Bu yadda saxlanılmış auditi silmək istəyirsiniz?',
       'demoAccountHeader': 'Demo Hesab Məlumatları',
       'demoPagesHeader': 'Demo Səhifələr',
       'dashboardTitle': 'Sizə uyğun günə baxış',
@@ -289,6 +291,8 @@ class AppLocalizations extends InheritedWidget {
       'logout': 'Log out',
       'logoutConfirm': 'Do you want to log out?',
       'cancel': 'Cancel',
+      'deleteAudit': 'Delete audit',
+      'deleteAuditConfirm': 'Do you want to delete this saved audit?',
       'demoAccountHeader': 'Demo account details',
       'demoPagesHeader': 'Demo pages',
       'dashboardSubtitle': 'A clear view of your account and next steps.',
@@ -441,6 +445,8 @@ class AppLocalizations extends InheritedWidget {
       'logout': 'Выйти из аккаунта',
       'logoutConfirm': 'Выйти из аккаунта?',
       'cancel': 'Отмена',
+      'deleteAudit': 'Удалить аудит',
+      'deleteAuditConfirm': 'Удалить этот сохраненный аудит?',
       'demoAccountHeader': 'Данные демо-аккаунта',
       'demoPagesHeader': 'Демо страницы',
       'dashboardTitle': 'Обзор на сегодня',
@@ -619,6 +625,8 @@ class AppLocalizations extends InheritedWidget {
       'logout': 'Аккаунттан шығу',
       'logoutConfirm': 'Аккаунттан шыққыңыз келе ме?',
       'cancel': 'Бас тарту',
+      'deleteAudit': 'Аудитті өшіру',
+      'deleteAuditConfirm': 'Бұл сақталған аудитті өшіру керек пе?',
       'demoAccountHeader': 'Демо есеп жазба деректері',
       'demoPagesHeader': 'Демо беттер',
       'dashboardTitle': 'Бүгінгі шолу',
@@ -1202,8 +1210,9 @@ class _HomeShellState extends State<HomeShell> {
     final saved = item['analysis'];
     if (saved is! Map) return;
     final savedAnalysis = Map<String, dynamic>.from(saved);
-    final savedAddress =
-        (savedAnalysis['address'] ?? item['address'] ?? '').toString().trim();
+    final savedAddress = (savedAnalysis['address'] ?? item['address'] ?? '')
+        .toString()
+        .trim();
     final savedBusiness =
         (item['businessType'] ?? savedAnalysis['business_query'] ?? 'business')
             .toString();
@@ -1231,8 +1240,8 @@ class _HomeShellState extends State<HomeShell> {
       await _saveAudit(address, businessType);
       if (mounted) {
         setState(() {
-          _auditAddress =
-              (_locationController.analysis?['address'] ?? address).toString();
+          _auditAddress = (_locationController.analysis?['address'] ?? address)
+              .toString();
         });
       }
     } catch (_) {
@@ -3215,30 +3224,6 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 38,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _visibleCities.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final city = _visibleCities[index];
-                      final selected = _selected?.name == city.name;
-                      return ChoiceChip(
-                        label: Text(city.name),
-                        selected: selected,
-                        onSelected: (_) => _focusCity(city),
-                        selectedColor: scheme.primary,
-                        labelStyle: TextStyle(
-                          color: selected ? Colors.white : null,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      );
-                    },
-                  ),
-                ),
               ],
             ),
           ),
@@ -3270,120 +3255,147 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: _showMapInfo
-                ? Material(
-                    elevation: 6,
-                    borderRadius: BorderRadius.circular(18),
-                    color: dark
-                        ? const Color(0xF218181B)
-                        : const Color(0xF2FFFFFF),
-                    child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                    child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _selected?.name ?? loc.t('mapTitle'),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+          if (_showMapInfo)
+            Positioned.fill(
+              child: DraggableScrollableSheet(
+                initialChildSize: .22,
+                minChildSize: .08,
+                maxChildSize: .78,
+                snap: true,
+                snapSizes: const [.22, .78],
+                builder: (context, scrollController) => Material(
+                  elevation: 8,
+                  color: dark
+                      ? const Color(0xF218181B)
+                      : const Color(0xF2FFFFFF),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(22),
+                  ),
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 20),
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: scheme.outline.withValues(alpha: .45),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        IconButton(
-                          tooltip: loc.t('close'),
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () => setState(() => _showMapInfo = false),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 38,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _visibleCities.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final city = _visibleCities[index];
+                            final selected = _selected?.name == city.name;
+                            return ChoiceChip(
+                              label: Text(city.name),
+                              selected: selected,
+                              onSelected: (_) => _focusCity(city),
+                              selectedColor: scheme.primary,
+                              labelStyle: TextStyle(
+                                color: selected ? Colors.white : null,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            );
+                          },
                         ),
-                        if (_selected != null) ...[
-                          IconButton(
-                            tooltip: loc.t('locationPassport'),
-                            onPressed: () =>
-                                ReportService().printLocationPassport(
-                                  address: _selected!.name,
-                                  score: 7.8,
-                                  verdict: 'Məkan ilkin mərhələ üçün uyğundur.',
-                                  risks: const [
-                                    'Rəqib sıxlığı yenidən yoxlanmalıdır',
-                                  ],
+                      ),
+                      if (_selected != null || analysis != null) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selected?.name ?? loc.t('mapTitle'),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
                                 ),
-                            icon: const Icon(Icons.picture_as_pdf_outlined),
-                          ),
-                          IconButton(
-                            tooltip: loc.t('whatsappNegotiation'),
-                            onPressed: () => _openWhatsApp(_selected!.name),
-                            icon: const Icon(Icons.chat_outlined),
-                          ),
-                          IconButton(
-                            tooltip: loc.t('openInMaps'),
-                            onPressed: () => _openInExternalMaps(
-                              _selected!.point,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            icon: const Icon(Icons.navigation),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _MapInfoChip(
-                          Icons.analytics_outlined,
-                          '${loc.t('locationIndex')}: ${analysis?['score'] ?? '--'}/100',
-                          scheme.primary,
+                            if (_selected != null) ...[
+                              IconButton(
+                                tooltip: loc.t('locationPassport'),
+                                onPressed: () =>
+                                    ReportService().printLocationPassport(
+                                      address: _selected!.name,
+                                      score: 7.8,
+                                      verdict:
+                                          'Məkan ilkin mərhələ üçün uyğundur.',
+                                      risks: const [
+                                        'Rəqib sıxlığı yenidən yoxlanmalıdır',
+                                      ],
+                                    ),
+                                icon: const Icon(Icons.picture_as_pdf_outlined),
+                              ),
+                              IconButton(
+                                tooltip: loc.t('whatsappNegotiation'),
+                                onPressed: () => _openWhatsApp(_selected!.name),
+                                icon: const Icon(Icons.chat_outlined),
+                              ),
+                              IconButton(
+                                tooltip: loc.t('openInMaps'),
+                                onPressed: () =>
+                                    _openInExternalMaps(_selected!.point),
+                                icon: const Icon(Icons.navigation),
+                              ),
+                            ],
+                          ],
                         ),
-                        _MapInfoChip(
-                          Icons.directions_walk,
-                          '${loc.t('footTraffic')}: ${analysis?['pedestrian_traffic'] ?? (analysis?['pedestrian_traffic_estimate'] == null ? '--' : '~${analysis?['pedestrian_traffic_estimate']}')}',
-                          AppColors.secondary,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _MapInfoChip(
+                              Icons.analytics_outlined,
+                              '${loc.t('locationIndex')}: ${analysis?['score'] ?? '--'}/100',
+                              scheme.primary,
+                            ),
+                            _MapInfoChip(
+                              Icons.directions_walk,
+                              '${loc.t('footTraffic')}: ${analysis?['pedestrian_traffic'] ?? (analysis?['pedestrian_traffic_estimate'] == null ? '--' : '~${analysis?['pedestrian_traffic_estimate']}')}',
+                              AppColors.secondary,
+                            ),
+                            _MapInfoChip(
+                              Icons.storefront_outlined,
+                              '${loc.t('competitors')}: ${analysis?['competitors_500m'] ?? '--'}',
+                              const Color(0xFFF59E0B),
+                            ),
+                            _MapInfoChip(
+                              Icons.local_parking_outlined,
+                              '${loc.t('parking')}: ${analysis?['parking_1km'] ?? '--'}',
+                              const Color(0xFF38BDF8),
+                            ),
+                            _MapInfoChip(
+                              Icons.directions_bus_outlined,
+                              '${loc.t('stops')}: ${analysis?['transport_stops_1km'] ?? '--'}',
+                              const Color(0xFF22C55E),
+                            ),
+                          ],
                         ),
-                        _MapInfoChip(
-                          Icons.storefront_outlined,
-                          '${loc.t('competitors')}: ${analysis?['competitors_500m'] ?? '--'}',
-                          const Color(0xFFF59E0B),
-                        ),
-                        _MapInfoChip(
-                          Icons.local_parking_outlined,
-                          '${loc.t('parking')}: ${analysis?['parking_1km'] ?? '--'}',
-                          const Color(0xFF38BDF8),
-                        ),
-                        _MapInfoChip(
-                          Icons.directions_bus_outlined,
-                          '${loc.t('stops')}: ${analysis?['transport_stops_1km'] ?? '--'}',
-                          const Color(0xFF22C55E),
-                        ),
-                      ],
-                    ),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 190),
-                      child: SingleChildScrollView(
-                        child: _MapCompetitorList(
+                        _MapAnalysisDetails(analysis: analysis, scheme: scheme),
+                        _MapCompetitorList(
                           competitors: analysis?['competitors'],
                           loc: loc,
                           scheme: scheme,
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    ],
+                  ),
                 ),
               ),
-                  )
-                : const SizedBox.shrink(),
-          ),
+            ),
         ],
       ),
     );
@@ -3460,27 +3472,30 @@ class _MapScreenState extends State<MapScreen> {
       if (analysis?['nearby_places'] is List)
         ...(analysis!['nearby_places'] as List).whereType<Map>(),
     ];
-    return items.map((item) {
-      final point = item['point'];
-      if (point is! Map) return null;
-      final lat = double.tryParse(point['lat']?.toString() ?? '');
-      final lon = double.tryParse(point['lon']?.toString() ?? '');
-      if (lat == null || lon == null) return null;
-      final isTransport = item['kind'] == 'transport';
-      return Marker(
-        point: LatLng(lat, lon),
-        width: 38,
-        height: 38,
-        child: Tooltip(
-          message: item['name']?.toString() ?? 'Yaxın obyekt',
-          child: Icon(
-            isTransport ? Icons.directions_bus : Icons.place,
-            color: isTransport ? scheme.tertiary : const Color(0xFF0EA5E9),
-            size: 25,
-          ),
-        ),
-      );
-    }).whereType<Marker>().toList();
+    return items
+        .map((item) {
+          final point = item['point'];
+          if (point is! Map) return null;
+          final lat = double.tryParse(point['lat']?.toString() ?? '');
+          final lon = double.tryParse(point['lon']?.toString() ?? '');
+          if (lat == null || lon == null) return null;
+          final isTransport = item['kind'] == 'transport';
+          return Marker(
+            point: LatLng(lat, lon),
+            width: 38,
+            height: 38,
+            child: Tooltip(
+              message: item['name']?.toString() ?? 'Yaxın obyekt',
+              child: Icon(
+                isTransport ? Icons.directions_bus : Icons.place,
+                color: isTransport ? scheme.tertiary : const Color(0xFF0EA5E9),
+                size: 25,
+              ),
+            ),
+          );
+        })
+        .whereType<Marker>()
+        .toList();
   }
 
   String _formatDistance(dynamic value) {
@@ -3644,6 +3659,187 @@ class _MapInfoChip extends StatelessWidget {
   }
 }
 
+class _MapAnalysisDetails extends StatelessWidget {
+  const _MapAnalysisDetails({required this.analysis, required this.scheme});
+
+  final Map<String, dynamic>? analysis;
+  final ColorScheme scheme;
+
+  String _value(dynamic value) {
+    if (value == null || value.toString().trim().isEmpty) return '—';
+    if (value is List) return value.join(', ');
+    if (value is Map)
+      return value.values.where((item) => item != null).join(', ');
+    return value.toString();
+  }
+
+  String _distance(dynamic value) {
+    final meters = num.tryParse(value?.toString() ?? '');
+    if (meters == null) return '—';
+    return meters >= 1000
+        ? '${(meters / 1000).toStringAsFixed(1)} km'
+        : '${meters.round()} m';
+  }
+
+  Widget _section(String title, List<Widget> children) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _line(String label, dynamic value) {
+    final text = _value(value);
+    if (text == '—') return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 142,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 10, color: scheme.outline),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _places(dynamic raw, {required String emptyLabel}) {
+    if (raw is! List || raw.isEmpty) {
+      return [_line(emptyLabel, '—')];
+    }
+    return raw.take(10).whereType<Map>().map((item) {
+      final name = item['name'] ?? item['title'] ?? emptyLabel;
+      final distance = _distance(item['distance_meters'] ?? item['distance']);
+      final address = item['address'];
+      return _line(
+        name.toString(),
+        [
+          distance,
+          if (address != null && address.toString().isNotEmpty) address,
+        ].join(' • '),
+      );
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = analysis;
+    if (data == null) return const SizedBox.shrink();
+    final quality = data['analysis_quality'] is Map
+        ? data['analysis_quality'] as Map
+        : const <dynamic, dynamic>{};
+    final insights = data['insights'] is Map
+        ? data['insights'] as Map
+        : const <dynamic, dynamic>{};
+    final noise = insights['digital_noise'] is Map
+        ? insights['digital_noise'] as Map
+        : const <dynamic, dynamic>{};
+    final peak = insights['peak_comparison'] is Map
+        ? insights['peak_comparison'] as Map
+        : const <dynamic, dynamic>{};
+    final magnets = insights['location_magnets'] is Map
+        ? insights['location_magnets'] as Map
+        : const <dynamic, dynamic>{};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _section('Məkan və analiz', [
+          _line('Mənbə', data['source']),
+          _line('Ünvan', data['address']),
+          _line('Yenilənib', data['updated_at']),
+          _line('Biznes sorğusu', data['business_query']),
+          _line('Ümumi bal', data['score']),
+          _line('Əlçatanlıq balı', data['accessibility_score']),
+          _line('Rəqabət balı', data['competition_score']),
+          _line('Ən yaxın rəqib', _distance(data['nearest_competitor_meters'])),
+          _line('500 m rəqib sayı', data['competitors_500m']),
+          _line('1 km rəqib sayı', data['competitors_1km']),
+          _line('1 km yaxın obyekt', data['nearby_places_1km']),
+        ]),
+        _section('Məlumat keyfiyyəti', [
+          _line('Geokodlaşdırılmış nöqtə', quality['geocoded_point']),
+          _line('Canlı rəqib sayı', quality['competitor_count_is_live']),
+          _line('Detallar yüklənib', quality['competitor_details_loaded']),
+          _line(
+            'Piyada saatlıq data',
+            quality['pedestrian_hourly_data_available'],
+          ),
+          _line('Qeyd', quality['note']),
+        ]),
+        _section('Trafik və rəqəmsal göstəricilər', [
+          _line('Piyada trafiki', data['pedestrian_traffic']),
+          _line('Trafik təxmini', data['pedestrian_traffic_estimate']),
+          _line('Trafik mənbəyi', data['pedestrian_traffic_source']),
+          _line('Trafik qeydi', data['pedestrian_traffic_note']),
+          _line('Ümumi rəy sayı', noise['review_total']),
+          _line(
+            'Cədvəli olan rəqiblər',
+            '${peak['schedule_available_for'] ?? '—'}/${peak['competitors_sample'] ?? '—'}',
+          ),
+          _line('Pik müqayisə mənbəyi', peak['source']),
+        ]),
+        _section('Məkan maqnitləri', [
+          _line(
+            'Ən yaxın dayanacaq',
+            _distance(magnets['nearest_transport_meters']),
+          ),
+          _line('Ən yaxın obyekt', magnets['nearest_place_name']),
+          _line('Obyektə məsafə', _distance(magnets['nearest_place_meters'])),
+          _line(
+            'Rəqibə məsafə',
+            _distance(magnets['competitor_distance_meters']),
+          ),
+        ]),
+        _section(
+          'Nəqliyyat dayanacaqları',
+          _places(
+            data['transport_stops'],
+            emptyLabel: 'Dayanacaq məlumatı yoxdur',
+          ),
+        ),
+        _section(
+          'Parking',
+          _places(data['parking'], emptyLabel: 'Parking məlumatı yoxdur'),
+        ),
+        _section(
+          'Yaxın obyektlər',
+          _places(
+            data['nearby_places'],
+            emptyLabel: 'Yaxın obyekt məlumatı yoxdur',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MapCompetitorList extends StatelessWidget {
   const _MapCompetitorList({
     required this.competitors,
@@ -3758,17 +3954,18 @@ class _MapCompetitorRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayName = item['name']?.toString().trim().isNotEmpty == true
-      ? item['name'].toString()
-      : '2GIS';
+        ? item['name'].toString()
+        : '2GIS';
     final rating = item['rating'] ?? item['rating_avg'];
     final reviewCount = item['review_count'] ?? item['reviews_count'];
-    final schedule = item['schedule_available'] == true ||
-      item['schedule'] != null ||
-      item['has_schedule'] == true;
+    final schedule =
+        item['schedule_available'] == true ||
+        item['schedule'] != null ||
+        item['has_schedule'] == true;
     final distance = item['distance_meters'] ?? item['distance'];
     final parking = item['nearest_parking_meters'] ?? item['parking_distance'];
     final transport =
-      item['nearest_transport_meters'] ?? item['transport_distance'];
+        item['nearest_transport_meters'] ?? item['transport_distance'];
     final background = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF222228)
         : const Color(0xFFF4F4F7);
@@ -3860,6 +4057,41 @@ class _MapCompetitorRow extends StatelessWidget {
                 ),
             ],
           ),
+          if (item['phone'] != null ||
+              item['website'] != null ||
+              item['business_status'] != null ||
+              item['price_level'] != null ||
+              item['editorial_summary'] != null ||
+              item['description'] != null ||
+              item['schedule_special'] != null ||
+              item['links'] != null ||
+              item['contact_groups'] != null ||
+              item['flags'] != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              [
+                if (item['phone'] != null) 'Tel: ${item['phone']}',
+                if (item['price_level'] != null)
+                  'Qiymət səviyyəsi: ${item['price_level']}',
+                if (item['business_status'] != null)
+                  'Status: ${item['business_status']}',
+                if (item['website'] != null) 'Sayt: ${item['website']}',
+                if (item['editorial_summary'] != null)
+                  item['editorial_summary'].toString(),
+                if (item['description'] != null) item['description'].toString(),
+                if (item['schedule_special'] != null)
+                  'Xüsusi qrafik: ${item['schedule_special']}',
+                if (item['links'] != null) 'Linklər: ${item['links']}',
+                if (item['contact_groups'] != null)
+                  'Əlaqə: ${item['contact_groups']}',
+                if (item['flags'] is List && (item['flags'] as List).isNotEmpty)
+                  'Status detalları: ${(item['flags'] as List).join(', ')}',
+              ].join(' • '),
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: scheme.outline),
+            ),
+          ],
         ],
       ),
     );
@@ -4438,18 +4670,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 itemCount: widget.audits.length,
                 itemBuilder: (context, index) {
                   final audit = widget.audits[index];
-              final saved = audit['analysis'] is Map
-                  ? Map<String, dynamic>.from(audit['analysis'] as Map)
-                  : <String, dynamic>{};
-                final auditAddress =
-                  (audit['displayAddress'] ??
-                      audit['address'] ??
-                      saved['address'] ??
-                      loc.t('mapTitle'))
-                    .toString();
-                final date =
-                  (audit['displayDate'] ?? audit['createdAt'] ?? '').toString();
-                final status = (audit['status'] ?? loc.t('auditStatus')).toString();
+                  final saved = audit['analysis'] is Map
+                      ? Map<String, dynamic>.from(audit['analysis'] as Map)
+                      : <String, dynamic>{};
+                  final auditAddress =
+                      (audit['displayAddress'] ??
+                              audit['address'] ??
+                              saved['address'] ??
+                              loc.t('mapTitle'))
+                          .toString();
+                  final date =
+                      (audit['displayDate'] ?? audit['createdAt'] ?? '')
+                          .toString();
+                  final status = (audit['status'] ?? loc.t('auditStatus'))
+                      .toString();
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _buildAuditCard(
@@ -4460,7 +4694,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       mutedColor,
                       status,
                       onTap: () => widget.onAuditSelected(audit),
-                      onDelete: () => widget.onAuditDeleted(audit),
+                      onDelete: () => _confirmAuditDelete(context, audit),
                     ),
                   );
                 },
@@ -4589,6 +4823,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ),
   );
 
+  Future<void> _confirmAuditDelete(
+    BuildContext context,
+    Map<String, dynamic> audit,
+  ) async {
+    final loc = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(loc.t('deleteAudit')),
+        content: Text(loc.t('deleteAuditConfirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(loc.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(loc.t('deleteAudit')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) widget.onAuditDeleted(audit);
+  }
+
   Widget _buildAuditCard(
     String title,
     String subtitle,
@@ -4649,11 +4908,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStatusBadge(String status, Color muted) {
     final normalized = status.toLowerCase();
-    final isReady = normalized.contains('hazır') ||
+    final isReady =
+        normalized.contains('hazır') ||
         normalized.contains('ready') ||
         normalized.contains('готов');
-    final statusColor =
-        isReady ? const Color(0xFF22C55E) : const Color(0xFFF59E0B);
+    final statusColor = isReady
+        ? const Color(0xFF22C55E)
+        : const Color(0xFFF59E0B);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
