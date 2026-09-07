@@ -1,0 +1,15 @@
+.tooling/
+
+# Generated Flutter and Android output
+**/.dart_tool/
+**/build/
+**/.gradle/
+**/local.properties
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Local secrets and environment files
+.env
+**/.env
+**/.env.*
+!**/.env.example
