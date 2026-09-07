@@ -19,6 +19,10 @@ services:
         sync: false
       - key: TWOGIS_API_KEY
         sync: false
+      - key: MAPS_PROVIDER
+        value: google
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
   - type: web
     name: ai-business-agent-analysis
     runtime: python

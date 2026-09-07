@@ -105,7 +105,8 @@ router.post('/chat', async (req, res) => {
 // user can discover a location before deciding to create an account.
 router.post('/location-analysis', async (req, res) => {
   try {
-    const { city, businessType, address } = req.body;
+    const { city, businessType, address, mapProvider } = req.body;
+    const provider = (mapProvider || process.env.MAPS_PROVIDER || '2gis').toLowerCase();
 
     if (!city || !businessType) {
       return res.status(400).json({
@@ -118,10 +119,12 @@ router.post('/location-analysis', async (req, res) => {
       city,
       businessType,
       address: address || city,
+      provider,
     });
 
     res.status(200).json({
       ...analysis,
+      provider,
       city,
       businessType,
       userId: req.user?.id || null,
@@ -130,7 +133,7 @@ router.post('/location-analysis', async (req, res) => {
     console.error('Location analysis error:', error);
     res.status(500).json({
       success: false,
-      message: '2GIS location analysis failed',
+      message: 'Location analysis failed',
       error: error.message,
     });
   }

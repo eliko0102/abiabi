@@ -12,11 +12,13 @@ class BusinessApiService {
     required String city,
     required String businessType,
     String address = '',
+    String mapProvider = '2gis',
   }) async {
     return _post('/api/location-analysis', {
       'city': city,
       'businessType': businessType,
       'address': address,
+      'mapProvider': mapProvider,
     });
   }
 
@@ -24,11 +26,13 @@ class BusinessApiService {
     required String city,
     required String businessType,
     String address = '',
+    String mapProvider = '2gis',
   }) {
     return analyzeLocation(
       city: city,
       businessType: businessType,
       address: address,
+      mapProvider: mapProvider,
     );
   }
 

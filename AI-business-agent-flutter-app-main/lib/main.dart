@@ -1010,6 +1010,12 @@ class LocationAnalysisController extends ChangeNotifier {
   final BusinessApiService _service = BusinessApiService();
   Map<String, dynamic>? analysis;
   bool isAnalyzing = false;
+  String mapProvider = ApiConfig.mapsProvider;
+
+  void setMapProvider(String provider) {
+    mapProvider = provider;
+    notifyListeners();
+  }
 
   void restoreAnalysis(Map<String, dynamic> savedAnalysis) {
     analysis = savedAnalysis;
@@ -1033,6 +1039,7 @@ class LocationAnalysisController extends ChangeNotifier {
         city: city,
         businessType: businessType,
         address: address,
+        mapProvider: mapProvider,
       );
     } finally {
       isAnalyzing = false;
@@ -1181,6 +1188,13 @@ class _HomeShellState extends State<HomeShell> {
       address: actualAddress,
       businessType: businessType,
     );
+    await _loadAuditHistory();
+  }
+
+  Future<void> _deleteAudit(Map<String, dynamic> audit) async {
+    final id = audit['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    await _auditHistoryService.remove(id);
     await _loadAuditHistory();
   }
 
@@ -1411,6 +1425,11 @@ class _HomeShellState extends State<HomeShell> {
                   localeCode: widget.currentLocaleCode,
                   audits: _auditHistory,
                   onAuditSelected: _openSavedAudit,
+                  onAuditDeleted: _deleteAudit,
+                  mapProvider: _locationController.mapProvider,
+                  onMapProviderChanged: (provider) => setState(
+                    () => _locationController.setMapProvider(provider),
+                  ),
                   onOldPoint: () => setState(() => _activeFlow = 1),
                   onNewPoint: () => setState(() => _activeFlow = 2),
                 ),
@@ -1424,6 +1443,11 @@ class _HomeShellState extends State<HomeShell> {
                   onLogout: _logout,
                   audits: _auditHistory,
                   onAuditSelected: _openSavedAudit,
+                  onAuditDeleted: _deleteAudit,
+                  mapProvider: _locationController.mapProvider,
+                  onMapProviderChanged: (provider) => setState(
+                    () => _locationController.setMapProvider(provider),
+                  ),
                 ),
               ],
             ),
@@ -4275,6 +4299,9 @@ class ProfileScreen extends StatefulWidget {
     required this.onLogout,
     required this.audits,
     required this.onAuditSelected,
+    required this.onAuditDeleted,
+    required this.mapProvider,
+    required this.onMapProviderChanged,
   });
 
   final Map<String, dynamic>? user;
@@ -4284,6 +4311,9 @@ class ProfileScreen extends StatefulWidget {
   final Future<void> Function() onLogout;
   final List<Map<String, dynamic>> audits;
   final ValueChanged<Map<String, dynamic>> onAuditSelected;
+  final ValueChanged<Map<String, dynamic>> onAuditDeleted;
+  final String mapProvider;
+  final ValueChanged<String> onMapProviderChanged;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -4401,7 +4431,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (widget.audits.isEmpty)
             Text(loc.t('noAudits'), style: TextStyle(color: mutedColor))
           else
-            ...widget.audits.map((audit) {
+            SizedBox(
+              height: widget.audits.length > 5 ? 360 : null,
+              child: ListView.builder(
+                shrinkWrap: widget.audits.length <= 5,
+                itemCount: widget.audits.length,
+                itemBuilder: (context, index) {
+                  final audit = widget.audits[index];
               final saved = audit['analysis'] is Map
                   ? Map<String, dynamic>.from(audit['analysis'] as Map)
                   : <String, dynamic>{};
@@ -4414,21 +4450,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final date =
                   (audit['displayDate'] ?? audit['createdAt'] ?? '').toString();
                 final status = (audit['status'] ?? loc.t('auditStatus')).toString();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildAuditCard(
-                  auditAddress,
-                  date,
-                  surfaceColor,
-                  textColor,
-                  mutedColor,
-                  status,
-                  onTap: () => widget.onAuditSelected(audit),
-                ),
-              );
-            }),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildAuditCard(
+                      auditAddress,
+                      date,
+                      surfaceColor,
+                      textColor,
+                      mutedColor,
+                      status,
+                      onTap: () => widget.onAuditSelected(audit),
+                      onDelete: () => widget.onAuditDeleted(audit),
+                    ),
+                  );
+                },
+              ),
+            ),
           const SizedBox(height: 24),
           _sectionTitle(loc.t('settingsTitle'), mutedColor),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: widget.mapProvider,
+            decoration: InputDecoration(
+              labelText: 'Xəritə və analiz mənbəyi',
+              labelStyle: TextStyle(color: mutedColor, fontSize: 12),
+            ),
+            items: const [
+              DropdownMenuItem(value: '2gis', child: Text('2GIS')),
+              DropdownMenuItem(value: 'google', child: Text('Google')),
+            ],
+            onChanged: (value) {
+              if (value != null) widget.onMapProviderChanged(value);
+            },
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -4543,6 +4597,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color muted,
     String status, {
     VoidCallback? onTap,
+    VoidCallback? onDelete,
   }) {
     return InkWell(
       onTap: onTap,
@@ -4579,6 +4634,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             _buildStatusBadge(status, muted),
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 18),
+              tooltip: 'Auditi sil',
+              color: muted,
+              visualDensity: VisualDensity.compact,
+            ),
           ],
         ),
       ),

@@ -33,6 +33,7 @@ class FlowLocalizations {
       'parking': 'Parking',
       'stops': 'Dayanacaq',
       'reviews': 'Rəy',
+      'comments': 'Şərhlər',
       'trafficUnavailable': 'Məlumat yoxdur',
       'hoursAvailable': 'İş qrafiki var',
       'reportDescription':
@@ -108,6 +109,7 @@ class FlowLocalizations {
       'parking': 'Parking',
       'stops': 'Stops',
       'reviews': 'Reviews',
+      'comments': 'Comments',
       'trafficUnavailable': 'Unavailable',
       'hoursAvailable': 'Hours available',
       'reportDescription':

@@ -42,4 +42,12 @@ class AuditHistoryService {
     if (history.length > 30) history.removeRange(30, history.length);
     await _storage.write(key: _key, value: jsonEncode(history));
   }
+
+  Future<void> remove(String id) async {
+    final history = await load();
+    history.removeWhere((item) => item['id']?.toString() == id);
+    await _storage.write(key: _key, value: jsonEncode(history));
+  }
+
+  Future<void> clear() => _storage.delete(key: _key);
 }

@@ -41,6 +41,9 @@ class ProductDashboardScreen extends StatelessWidget {
     required this.onNewPoint,
     required this.audits,
     required this.onAuditSelected,
+    required this.onAuditDeleted,
+    required this.mapProvider,
+    required this.onMapProviderChanged,
     required this.localeCode,
   });
 
@@ -48,6 +51,9 @@ class ProductDashboardScreen extends StatelessWidget {
   final VoidCallback onNewPoint;
   final List<Map<String, dynamic>> audits;
   final ValueChanged<Map<String, dynamic>> onAuditSelected;
+  final ValueChanged<Map<String, dynamic>> onAuditDeleted;
+  final String mapProvider;
+  final ValueChanged<String> onMapProviderChanged;
   final String localeCode;
 
   @override
@@ -702,6 +708,12 @@ class AuditReportScreen extends StatelessWidget {
     final magnets = insights['location_magnets'] is Map
         ? insights['location_magnets'] as Map
         : <dynamic, dynamic>{};
+    final transportStops = analysis?['transport_stops'] is List
+      ? (analysis!['transport_stops'] as List).whereType<Map>().toList()
+      : <Map>[];
+    final parking = analysis?['parking'] is List
+      ? (analysis!['parking'] as List).whereType<Map>().toList()
+      : <Map>[];
     final reviewLeaders = noise['leaders'] is List
         ? (noise['leaders'] as List).whereType<Map>().toList()
         : <Map>[];
@@ -774,6 +786,33 @@ class AuditReportScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _ReportBlock(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t('stops'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    if (transportStops.isEmpty)
+                      Text(_insightText('noStopsData'))
+                    else
+                      ...transportStops.take(5).map((item) => Text(
+                        '${item['name'] ?? t('stops')} • ${_formatMeters(item['distance_meters'])}${item['address'] == null || item['address'] == '' ? '' : ' • ${item['address']}'}',
+                        style: const TextStyle(fontSize: 11),
+                      )),
+                    const SizedBox(height: 12),
+                    Text(t('parking'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    if (parking.isEmpty)
+                      Text(_insightText('noParkingData'))
+                    else
+                      ...parking.take(5).map((item) => Text(
+                        '${item['name'] ?? t('parking')} • ${_formatMeters(item['distance_meters'])}${item['capacity'] == null ? '' : ' • ${item['capacity']}'}',
+                        style: const TextStyle(fontSize: 11),
+                      )),
                   ],
                 ),
               ),
@@ -876,6 +915,9 @@ class AuditReportScreen extends StatelessWidget {
                               '${t('parking')}: ${_formatMeters(item['nearest_parking_meters'])}${item['parking_within_500m'] == null ? '' : ' (${item['parking_within_500m']})'}',
                               '${t('stops')}: ${_formatMeters(item['nearest_transport_meters'])}${item['transport_stops_within_500m'] == null ? '' : ' (${item['transport_stops_within_500m']})'}',
                               '${t('reviews')}: ${item['review_count'] ?? '—'}',
+                              if (item['comments'] is List &&
+                                  (item['comments'] as List).isNotEmpty)
+                                '${t('comments')}: ${(item['comments'] as List).take(2).map((comment) => comment is Map ? comment['text'] : comment).join(' • ')}',
                               '${t('traffic')}: ${t('trafficUnavailable')}',
                               if (item['schedule_available'] == true ||
                                   item['schedule'] != null)
@@ -1054,6 +1096,8 @@ class AuditReportScreen extends StatelessWidget {
         'peakDataNote': 'Məşğulluq məlumatı 2GIS cədvəlləri olduqda göstərilir',
         'nearestPoints': 'ən yaxın nöqtə',
         'noCompetitorData': 'Bu ərazi üçün rəqib məlumatı tapılmadı',
+        'noStopsData': 'Dayanacaq məlumatı tapılmadı',
+        'noParkingData': 'Parking məlumatı tapılmadı',
         'businessObject': 'Biznes obyekti',
         'noReviewData': 'Rəylər üzrə kifayət qədər məlumat yoxdur',
         'reviewDataNote':
@@ -1077,6 +1121,8 @@ class AuditReportScreen extends StatelessWidget {
             'Occupancy data is shown when 2GIS schedules are available',
         'nearestPoints': 'nearest locations',
         'noCompetitorData': 'No competitor data found for this area',
+        'noStopsData': 'No stop data found',
+        'noParkingData': 'No parking data found',
         'businessObject': 'Business location',
         'noReviewData': 'Not enough review data',
         'reviewDataNote':

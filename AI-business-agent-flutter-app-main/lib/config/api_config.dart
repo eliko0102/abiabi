@@ -17,8 +17,12 @@ class ApiConfig {
     defaultValue: 'http://127.0.0.1:8000',
   );
   static const aiApiKey = String.fromEnvironment('TOCHKA_AI_API_KEY');
-  static const mapsProvider = '2gis';
+  static const mapsProvider = String.fromEnvironment(
+    'MAPS_PROVIDER',
+    defaultValue: '2gis',
+  );
   static const twoGisKey = String.fromEnvironment('TWOGIS_API_KEY');
+  static const googleMapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
   static const firebaseProjectId = String.fromEnvironment(
     'FIREBASE_PROJECT_ID',
     defaultValue: 'ai-agent-app-be146',

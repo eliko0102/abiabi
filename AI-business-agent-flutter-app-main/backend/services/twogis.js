@@ -183,7 +183,90 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-export async function analyze2GisLocation({ address, city, businessType }) {
+async function analyzeGoogleLocation({ address, city, businessType }) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new Error('GOOGLE_MAPS_API_KEY konfiqurasiya edilməyib');
+  const query = `${businessType} near ${address || city}`;
+  const search = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+    params: { query, key, language: 'az' },
+    timeout: 12000,
+  });
+  if (search.data?.status !== 'OK' && search.data?.status !== 'ZERO_RESULTS') {
+    throw new Error(`Google Places API: ${search.data?.status || 'unknown error'}`);
+  }
+  const results = search.data?.results || [];
+  const competitors = results.map((item) => ({
+    id: item.place_id || null,
+    name: item.name || 'Google obyekt',
+    address: item.formatted_address || '',
+    point: { lat: item.geometry?.location?.lat, lon: item.geometry?.location?.lng },
+    distance_meters: null,
+    rating: item.rating ?? null,
+    review_count: item.user_ratings_total ?? 0,
+    rubrics: item.types || [],
+    schedule: item.opening_hours || null,
+    comments: [],
+  })).filter((item) => Number.isFinite(item.point.lat) && Number.isFinite(item.point.lon));
+  await Promise.all(competitors.slice(0, 20).map(async (item) => {
+    if (!item.id) return;
+    try {
+      const details = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+        params: {
+          place_id: item.id,
+          fields: 'opening_hours,reviews,user_ratings_total,rating,formatted_address,name,geometry',
+          key,
+          language: 'az',
+        },
+        timeout: 12000,
+      });
+      const result = details.data?.result;
+      if (!result) return;
+      item.schedule = result.opening_hours || item.schedule;
+      item.rating = result.rating ?? item.rating;
+      item.review_count = result.user_ratings_total ?? item.review_count;
+      item.comments = (result.reviews || []).slice(0, 3).map((review) => ({
+        text: review.text || null,
+        rating: review.rating ?? null,
+        author: review.author_name || null,
+      })).filter((review) => review.text);
+    } catch (error) {
+      console.warn(`Google place details failed for ${item.id}:`, error.message);
+    }
+  }));
+  const point = competitors[0]?.point || null;
+  return {
+    success: true,
+    source: 'Google Places API',
+    updated_at: new Date().toISOString(),
+    address: competitors[0]?.address || address || city,
+    point,
+    score: 0,
+    pedestrian_traffic: null,
+    pedestrian_traffic_estimate: null,
+    competitors_500m: competitors.length,
+    competitors_1km: competitors.length,
+    nearest_competitor_meters: null,
+    accessibility_score: null,
+    competition_score: null,
+    business_query: businessType,
+    competitors,
+    transport_stops_1km: 0,
+    transport_stops: [],
+    parking_1km: 0,
+    parking: [],
+    nearby_places: [],
+    nearby_places_1km: 0,
+    insights: {
+      digital_noise: { review_total: competitors.reduce((sum, item) => sum + item.review_count, 0), leaders: competitors.slice(0, 4) },
+      peak_comparison: { schedule_available_for: competitors.filter((item) => item.schedule).length, competitors_sample: competitors.length },
+    },
+  };
+}
+
+export async function analyze2GisLocation({ address, city, businessType, provider }) {
+  if ((provider || process.env.MAPS_PROVIDER || '2gis').toLowerCase() === 'google') {
+    return analyzeGoogleLocation({ address, city, businessType });
+  }
   const key = process.env.TWOGIS_API_KEY;
   if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
 
@@ -194,12 +277,18 @@ export async function analyze2GisLocation({ address, city, businessType }) {
   const [competitorItems, transportItems, parkingItems, publicPlaceItems] = await Promise.all([
     nearby(key, point, businessQuery),
     nearby(key, point, 'остановка общественного транспорта', 'station'),
-    nearby(key, point, 'парковка', 'parking', 'items.point,items.address,items.is_paid,items.capacity,items.level_count,items.access,items.paving_type,items.links'),
+    nearby(key, point, 'парковка', 'parking', 'items.point,items.address,items.is_paid,items.capacity,items.level_count,items.access,items.paving_type,items.links,items.reviews,items.schedule'),
     nearby(key, point, 'магазин кафе аптека', 'branch'),
   ]);
 
   const detailedCompetitorItems = await Promise.all(
     competitorItems.slice(0, 20).map((item) => detailsById(key, item)),
+  );
+  const detailedTransportItems = await Promise.all(
+    transportItems.slice(0, 20).map((item) => detailsById(key, item)),
+  );
+  const detailedParkingItems = await Promise.all(
+    parkingItems.slice(0, 20).map((item) => detailsById(key, item)),
   );
 
   const competitors = detailedCompetitorItems
@@ -238,7 +327,7 @@ export async function analyze2GisLocation({ address, city, businessType }) {
   const scheduleAvailable = competitors.filter((item) => item.schedule).length;
   const totalNearby = publicPlaceItems.length;
   const transportCount = transportItems.length;
-  const parking = parkingItems
+  const parking = detailedParkingItems
     .map((item) => {
       const itemPoint = pointOf(item);
       if (!itemPoint) return null;
@@ -253,6 +342,14 @@ export async function analyze2GisLocation({ address, city, businessType }) {
         level_count: item.level_count ?? null,
         access: item.access ?? null,
         paving_type: item.paving_type ?? null,
+        schedule: item.schedule || null,
+        review_count: item.reviews?.general_review_count ?? item.reviews?.review_count ?? 0,
+        comments: Array.isArray(item.reviews?.items)
+          ? item.reviews.items.slice(0, 3).map((review) => ({
+            text: review.text || review.comment || null,
+            rating: review.rating ?? null,
+          })).filter((review) => review.text)
+          : [],
       };
     })
     .filter(Boolean)
@@ -323,12 +420,15 @@ export async function analyze2GisLocation({ address, city, businessType }) {
     })
     .filter(Boolean)
     .sort((a, b) => a.distance_meters - b.distance_meters);
-  const transportStops = transportItems.map((item) => ({
+  const transportStops = detailedTransportItems.map((item) => ({
     id: item.id?.toString() || null,
     name: item.name || item.full_name || 'Остановка',
     point: pointOf(item),
     distance_meters: pointOf(item) ? distanceMeters(point, pointOf(item)) : null,
     kind: 'transport',
+    address: item.address_name || item.full_name || '',
+    schedule: item.schedule || null,
+    description: item.description || null,
   })).filter((item) => item.point);
 
   return {
