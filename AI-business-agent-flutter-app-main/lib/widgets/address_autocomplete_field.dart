@@ -49,7 +49,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
       setState(() => _isLoading = true);
       try {
         final uri = Uri.parse(
-          '${ApiConfig.baseUrl}/suggest?q=${Uri.encodeComponent(query)}&city=${Uri.encodeComponent(widget.city)}',
+          '${ApiConfig.backendUrl}/api/suggest?q=${Uri.encodeComponent(query)}&city=${Uri.encodeComponent(widget.city)}',
         );
         final res = await http.get(uri).timeout(const Duration(seconds: 5));
         if (res.statusCode == 200) {
