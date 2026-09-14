@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 import '../services/ai_service.dart';
 import '../widgets/address_autocomplete_field.dart';
@@ -13,6 +17,74 @@ typedef AuditCallback =
       required List<String> problems,
       required String address,
     });
+
+Future<String?> confirmUserLocation(BuildContext context) async {
+  var detectedCity = 'Bakı';
+  try {
+    if (await Geolocator.isLocationServiceEnabled()) {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever) {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        final url = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+          'format': 'json',
+          'lat': position.latitude.toString(),
+          'lon': position.longitude.toString(),
+        });
+        final response = await http.get(
+          url,
+          headers: const {'User-Agent': 'AI-Business-Agent'},
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final address = data['address'] as Map<String, dynamic>? ?? {};
+          detectedCity = (address['city'] ??
+                  address['town'] ??
+                  address['state'] ??
+                  detectedCity)
+              .toString();
+        }
+      }
+    }
+  } catch (_) {
+    // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
+  }
+  if (!context.mounted) return detectedCity;
+  final cityController = TextEditingController(text: detectedCity);
+  final result = await showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Cari Şəhəriniz'),
+      content: TextField(
+        controller: cityController,
+        decoration: const InputDecoration(labelText: 'Şəhər'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            final city = cityController.text.trim();
+            Navigator.pop(dialogContext, city.isEmpty ? null : city);
+          },
+          child: const Text('Dəyiş'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, cityController.text.trim()),
+          child: const Text('Təsdiqlə'),
+        ),
+      ],
+    ),
+  );
+  cityController.dispose();
+  return result;
+}
 
 const businessCategoryIds = <String>[
   'business_cafe',
@@ -59,6 +131,15 @@ class ProductDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final oldPointCount = audits
+      .where(
+        (audit) =>
+          audit['flowType'] == null || audit['flowType'] == 'old',
+      )
+      .length;
+    final newPointCount = audits
+      .where((audit) => audit['flowType'] == 'new')
+      .length;
     final scheme = Theme.of(context).colorScheme;
     final t = (String key) => FlowLocalizations.t(localeCode, key);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -122,14 +203,14 @@ class ProductDashboardScreen extends StatelessWidget {
                         Expanded(
                           child: _DashboardStatCard(
                             title: t('oldPoint'),
-                            value: '24',
+                            value: oldPointCount.toString(),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _DashboardStatCard(
                             title: t('newPoint'),
-                            value: '3',
+                            value: newPointCount.toString(),
                           ),
                         ),
                       ],
@@ -402,11 +483,13 @@ class OldPointSurveyScreen extends StatefulWidget {
     required this.onBack,
     required this.onAudit,
     required this.localeCode,
+    this.city = '',
   });
 
   final VoidCallback onBack;
   final AuditCallback onAudit;
   final String localeCode;
+  final String city;
 
   @override
   State<OldPointSurveyScreen> createState() => _OldPointSurveyScreenState();
@@ -649,6 +732,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
                 controller: _addressController,
                 hintText: t('addressHint'),
                 isBottomInput: true,
+                city: widget.city,
                 onSelected: (_) => setState(() {}),
               ),
             ),
@@ -1539,11 +1623,13 @@ class NewPointAssistantScreen extends StatefulWidget {
     required this.onMap,
     required this.onAnalyze,
     required this.localeCode,
+    this.initialCity = '',
   });
   final VoidCallback onBack;
   final VoidCallback onMap;
-  final Future<void> Function(String businessType, String address) onAnalyze;
+  final Future<void> Function(String businessType, String address, String city) onAnalyze;
   final String localeCode;
+  final String initialCity;
 
   @override
   State<NewPointAssistantScreen> createState() =>
@@ -1559,6 +1645,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
   String? _business;
   String? _address;
   bool _loading = false;
+  String _city = '';
 
   String _t(String key) => FlowLocalizations.t(widget.localeCode, key);
 
@@ -1572,6 +1659,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
         actions: const ['startNew', 'ownAddress'],
       ),
     ];
+    _city = widget.initialCity;
   }
 
   @override
@@ -1640,7 +1728,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     if (_business == null || _address == null) return;
     setState(() => _loading = true);
     try {
-      await widget.onAnalyze(_t(_business!), _address!);
+      await widget.onAnalyze(_t(_business!), _address!, _city);
       if (!mounted) return;
       setState(() => _loading = false);
       _add('assistant', _t('analysisReady'), actions: const ['mapZones']);
@@ -1815,6 +1903,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                     controller: _inputController,
                     hintText: _t('chatHint'),
                     isBottomInput: true,
+                    city: _city,
                     onSelected: (_) => _send(),
                     onSubmitted: _send,
                   ),

@@ -93,20 +93,49 @@ function parseReviewCount(item) {
 
 export async function suggest2GisAddress(q, city = '') {
   const key = process.env.TWOGIS_API_KEY;
-  if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
-  const query = city && !q.toLowerCase().includes(city.toLowerCase()) ? `${city}, ${q}` : q;
+  const normalizedQuery = q.trim();
+  const query = city && !normalizedQuery.toLowerCase().includes(city.toLowerCase())
+    ? `${city}, ${normalizedQuery}`
+    : normalizedQuery;
+  if (key) {
+    try {
+      const response = await catalogGet('/3.0/suggest', {
+        q: query,
+        page_size: 7,
+        fields: 'items.point,items.full_name,items.address_name,items.adm_div',
+      }, key);
+      const suggestions = itemsFrom(response).map((item) => {
+        const cityDiv = Array.isArray(item.adm_div)
+          ? item.adm_div.find((division) => division?.type === 'city')
+          : null;
+        return {
+          name: item.full_name || item.address_name || item.name,
+          city: cityDiv?.name || city || '',
+          point: pointOf(item),
+        };
+      });
+      if (suggestions.length > 0) return suggestions;
+    } catch (error) {
+      console.warn('2GIS Suggest error:', error.message);
+    }
+  }
+
   try {
-    const response = await catalogGet('/3.0/suggest', {
-      q: query,
-      page_size: 5,
-      fields: 'items.point,items.full_name,items.address_name',
-    }, key);
-    return itemsFrom(response).map(item => ({
-      name: item.full_name || item.address_name || item.name,
-      point: pointOf(item),
-    }));
+    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: { q: query, format: 'jsonv2', limit: 5 },
+      headers: { 'User-Agent': 'AI-Business-Agent/1.0 (address search)' },
+      timeout: 10000,
+    });
+    return (Array.isArray(response.data) ? response.data : []).map((item) => ({
+      name: item.display_name || item.name || query,
+      city: item.address?.city || item.address?.town || item.address?.state || city || '',
+      point: {
+        lat: Number(item.lat),
+        lon: Number(item.lon),
+      },
+    })).filter((item) => item.point && Number.isFinite(item.point.lat) && Number.isFinite(item.point.lon));
   } catch (error) {
-    console.warn('2GIS Suggest error:', error.message);
+    console.warn('Address fallback error:', error.message);
     return [];
   }
 }

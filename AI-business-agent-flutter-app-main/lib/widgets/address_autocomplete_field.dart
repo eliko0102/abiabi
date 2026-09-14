@@ -6,6 +6,38 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 
+Future<Map<String, dynamic>?> showCitySelectionDialog({
+  required BuildContext context,
+  required String query,
+  required List<Map<String, dynamic>> options,
+}) async {
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('"$query" üçün şəhər seçin'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: options.length,
+          separatorBuilder: (_, __) => const Divider(),
+          itemBuilder: (context, index) {
+            final item = options[index];
+            final cityName = item['city'] ?? item['address'] ?? 'Məlum olmayan şəhər';
+            final title = item['name'] ?? query;
+            return ListTile(
+              leading: const Icon(Icons.location_city, color: Color(0xFFA855F7)),
+              title: Text(title.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(cityName.toString()),
+              onTap: () => Navigator.pop(context, item),
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
+
 class AddressAutocompleteField extends StatefulWidget {
   const AddressAutocompleteField({
     super.key,
@@ -32,6 +64,7 @@ class AddressAutocompleteField extends StatefulWidget {
 class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
+  bool _hasSearched = false;
   Timer? _debounce;
 
   void _onSearchChanged(String query) {
@@ -41,26 +74,52 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
       setState(() {
         _suggestions = [];
         _isLoading = false;
+        _hasSearched = false;
       });
       return;
     }
 
     _debounce = Timer(const Duration(milliseconds: 300), () async {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _hasSearched = true;
+      });
       try {
         final uri = Uri.parse(
           '${ApiConfig.backendUrl}/api/suggest?q=${Uri.encodeComponent(query)}&city=${Uri.encodeComponent(widget.city)}',
         );
-        final res = await http.get(uri).timeout(const Duration(seconds: 5));
+        final res = await http.get(uri).timeout(const Duration(seconds: 10));
+        var results = <Map<String, dynamic>>[];
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
-          if (mounted) {
-            setState(() {
-              _suggestions = List<Map<String, dynamic>>.from(
-                data['suggestions'] ?? [],
-              );
-            });
+          results = List<Map<String, dynamic>>.from(data['suggestions'] ?? []);
+        }
+
+        if (results.isEmpty) {
+          final osmUri = Uri.https('nominatim.openstreetmap.org', '/search', {
+            'q': widget.city.isNotEmpty ? '${widget.city}, $query' : query,
+            'format': 'jsonv2',
+            'limit': '5',
+          });
+          final osmRes = await http
+              .get(
+                osmUri,
+                headers: const {'User-Agent': 'AI-Business-Agent'},
+              )
+              .timeout(const Duration(seconds: 10));
+          if (osmRes.statusCode == 200) {
+            final osmData = jsonDecode(osmRes.body) as List;
+            results = osmData.map<Map<String, dynamic>>((item) => {
+              'name': item['display_name'],
+              'city': widget.city,
+              'lat': item['lat'],
+              'lon': item['lon'],
+            }).toList();
           }
+        }
+
+        if (mounted) {
+          setState(() => _suggestions = results);
         }
       } catch (_) {
         if (mounted) setState(() => _suggestions = []);
@@ -70,15 +129,31 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     });
   }
 
-  void _selectItem(Map<String, dynamic> item) {
+  Future<void> _selectItem(Map<String, dynamic> item) async {
+    final cities = <String>{
+      for (final suggestion in _suggestions)
+        (suggestion['city']?.toString() ?? '').trim(),
+    }..removeWhere((city) => city.isEmpty);
+    if (cities.length > 1) {
+      final selected = await showCitySelectionDialog(
+        context: context,
+        query: widget.controller.text.trim(),
+        options: _suggestions,
+      );
+      if (selected == null || !mounted) return;
+      item = selected;
+    }
     widget.controller.text = item['name'] ?? '';
-    setState(() => _suggestions = []);
+    setState(() {
+      _suggestions = [];
+      _hasSearched = false;
+    });
     FocusScope.of(context).unfocus();
     widget.onSelected(item);
   }
 
   Widget _buildSuggestionsBox() {
-    if (_suggestions.isEmpty && !_isLoading) return const SizedBox.shrink();
+    if (!_hasSearched && _suggestions.isEmpty) return const SizedBox.shrink();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -86,7 +161,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
         bottom: widget.isBottomInput ? 8.0 : 0.0,
         top: widget.isBottomInput ? 0.0 : 8.0,
       ),
-      constraints: const BoxConstraints(maxHeight: 200),
+      constraints: const BoxConstraints(maxHeight: 220),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E24) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -114,6 +189,20 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                   ),
                 ),
               )
+            : _suggestions.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_off, size: 18, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      'Nəticə tapılmadı',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              )
             : ListView.separated(
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
@@ -121,6 +210,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final item = _suggestions[index];
+                  final city = item['city']?.toString() ?? widget.city;
                   return ListTile(
                     dense: true,
                     leading: const Icon(
@@ -129,7 +219,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                       color: Color(0xFFA855F7),
                     ),
                     title: Text(
-                      item['name'] ?? '',
+                      item['name']?.toString() ?? '',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -137,6 +227,15 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    subtitle: city.isNotEmpty
+                        ? Text(
+                            city,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          )
+                        : null,
                     onTap: () => _selectItem(item),
                   );
                 },
@@ -161,7 +260,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
           controller: widget.controller,
           onChanged: _onSearchChanged,
           onSubmitted: (_) {
-            setState(() => _suggestions = []);
+            setState(() {
+              _suggestions = [];
+              _hasSearched = false;
+            });
             widget.onSubmitted?.call();
           },
           decoration: InputDecoration(
@@ -172,7 +274,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () {
                       widget.controller.clear();
-                      setState(() => _suggestions = []);
+                      setState(() {
+                        _suggestions = [];
+                        _hasSearched = false;
+                      });
                     },
                   )
                 : null,

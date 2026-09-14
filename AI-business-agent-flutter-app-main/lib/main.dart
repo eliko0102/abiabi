@@ -1297,6 +1297,9 @@ class _HomeShellState extends State<HomeShell> {
   bool _showNotifications = false;
   int? _activeFlow;
   String _auditAddress = '';
+  String _confirmedCity = '';
+  bool _locationPromptShown = false;
+  String? _auditUserId;
 
   final List<String> _notifications = const [
     'Yeni sınaq bildirişi: hesabınız uğurla yaradıldı.',
@@ -1308,11 +1311,15 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _restoreSession();
-    _loadAuditHistory();
   }
 
   Future<void> _loadAuditHistory() async {
-    final history = await _auditHistoryService.load();
+    final userId = _auditUserId;
+    if (userId == null || userId.isEmpty) {
+      if (mounted) setState(() => _auditHistory = []);
+      return;
+    }
+    final history = await _auditHistoryService.load(userId: userId);
     if (!mounted) return;
     final processedHistory = history.map((item) {
       final analysis = item['analysis'] is Map
@@ -1376,22 +1383,30 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
-  Future<void> _saveAudit(String address, String businessType) async {
+  Future<void> _saveAudit(
+    String address,
+    String businessType, {
+    String flowType = 'old',
+  }) async {
     final result = _locationController.analysis;
-    if (result == null) return;
+    final userId = _auditUserId;
+    if (result == null || userId == null || userId.isEmpty) return;
     final actualAddress = (result['address'] ?? address).toString();
     await _auditHistoryService.add(
+      userId: userId,
       analysis: result,
       address: actualAddress,
       businessType: businessType,
+      flowType: flowType,
     );
     await _loadAuditHistory();
   }
 
   Future<void> _deleteAudit(Map<String, dynamic> audit) async {
     final id = audit['id']?.toString();
-    if (id == null || id.isEmpty) return;
-    await _auditHistoryService.remove(id);
+    final userId = _auditUserId;
+    if (id == null || id.isEmpty || userId == null || userId.isEmpty) return;
+    await _auditHistoryService.remove(userId: userId, id: id);
     await _loadAuditHistory();
   }
 
@@ -1422,11 +1437,15 @@ class _HomeShellState extends State<HomeShell> {
     if (address.isEmpty) return;
     try {
       await _locationController.analyze(
-        city: address,
+        city: _confirmedCity.isNotEmpty ? _confirmedCity : address,
         businessType: businessType,
         address: address,
       );
-      await _saveAudit(address, businessType);
+      await _saveAudit(
+        address,
+        businessType,
+        flowType: fallback['flowType']?.toString() ?? 'old',
+      );
       if (mounted) {
         setState(() {
           _auditAddress = (_locationController.analysis?['address'] ?? address)
@@ -1475,6 +1494,10 @@ class _HomeShellState extends State<HomeShell> {
       _savedUser = null;
       _activeFlow = null;
       _selectedIndex = 0;
+      _auditUserId = null;
+      _auditHistory = [];
+      _confirmedCity = '';
+      _locationPromptShown = false;
     });
   }
 
@@ -1484,10 +1507,22 @@ class _HomeShellState extends State<HomeShell> {
       _authenticated = true;
       _currentUser = user;
       _savedUser = user;
+      _auditUserId = user['id']?.toString();
       _selectedIndex = 0;
       _activeFlow = null;
       _checkingSession = false;
     });
+    _loadAuditHistory();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _confirmInitialCity());
+  }
+
+  Future<void> _confirmInitialCity() async {
+    if (_locationPromptShown || !mounted) return;
+    _locationPromptShown = true;
+    final city = await confirmUserLocation(context);
+    if (mounted && city != null && city.trim().isNotEmpty) {
+      setState(() => _confirmedCity = city.trim());
+    }
   }
 
   @override
@@ -1631,7 +1666,10 @@ class _HomeShellState extends State<HomeShell> {
                   onOldPoint: () => setState(() => _activeFlow = 1),
                   onNewPoint: () => setState(() => _activeFlow = 2),
                 ),
-                MapScreen(controller: _locationController),
+                MapScreen(
+                  controller: _locationController,
+                  city: _confirmedCity,
+                ),
                 ChatScreen(controller: _locationController),
                 ProfileScreen(
                   user: _currentUser,
@@ -1652,12 +1690,14 @@ class _HomeShellState extends State<HomeShell> {
           if (_authenticated && _activeFlow == 1)
             OldPointSurveyScreen(
               localeCode: widget.currentLocaleCode,
+              city: _confirmedCity,
               onBack: () => setState(() => _activeFlow = null),
               onAudit: _runAudit,
             ),
           if (_authenticated && _activeFlow == 2)
             NewPointAssistantScreen(
               localeCode: widget.currentLocaleCode,
+              initialCity: _confirmedCity,
               onBack: () => setState(() => _activeFlow = null),
               onAnalyze: _runChatLocationAnalysis,
               onMap: () => setState(() {
@@ -1720,7 +1760,7 @@ class _HomeShellState extends State<HomeShell> {
           '$businessType${problems.isEmpty ? '' : ' — ${problems.join(', ')}'}',
       address: address,
     );
-    await _saveAudit(address, businessType);
+    await _saveAudit(address, businessType, flowType: 'old');
     if (!mounted) return _locationController.analysis;
     setState(() {
       _auditAddress = (_locationController.analysis?['address'] ?? address)
@@ -1733,13 +1773,15 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _runChatLocationAnalysis(
     String businessType,
     String address,
+    String city,
   ) async {
+    final analysisCity = city.trim().isEmpty ? address : city;
     await _locationController.analyze(
-      city: address,
+      city: analysisCity,
       businessType: businessType,
       address: address,
     );
-    await _saveAudit(address, businessType);
+    await _saveAudit(address, businessType, flowType: 'new');
   }
 }
 
@@ -3040,9 +3082,10 @@ class _CityPin {
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.controller});
+  const MapScreen({super.key, required this.controller, this.city = ''});
 
   final LocationAnalysisController controller;
+  final String city;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -3230,7 +3273,7 @@ class _MapScreenState extends State<MapScreen> {
       // Search and geocode through the backend's 2GIS Catalog API first.
       // This keeps the selected address and the map marker in the same source.
       await widget.controller.analyze(
-        city: query,
+        city: widget.city.isNotEmpty ? widget.city : query,
         businessType: 'business',
         address: query,
       );
@@ -3255,7 +3298,7 @@ class _MapScreenState extends State<MapScreen> {
       // Keep OSM as a fallback when the backend/key is unavailable.
       try {
         final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-          'q': query,
+          'q': widget.city.isNotEmpty ? '${widget.city}, $query' : query,
           'format': 'jsonv2',
           'limit': '1',
         });
@@ -3384,6 +3427,7 @@ class _MapScreenState extends State<MapScreen> {
                     controller: _searchController,
                     hintText: loc.t('searchAddressHint'),
                     isBottomInput: false,
+                    city: widget.city,
                     onSelected: (_) => _searchAddress(),
                     onSubmitted: _searchAddress,
                   ),

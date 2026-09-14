@@ -6,12 +6,13 @@ class AuditHistoryService {
   AuditHistoryService({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
 
-  static const _key = 'location_audit_history';
   final FlutterSecureStorage _storage;
 
-  Future<List<Map<String, dynamic>>> load() async {
+  String _keyFor(String userId) => 'location_audit_history_$userId';
+
+  Future<List<Map<String, dynamic>>> load({required String userId}) async {
     try {
-      final raw = await _storage.read(key: _key);
+      final raw = await _storage.read(key: _keyFor(userId));
       if (raw == null || raw.isEmpty) return [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) return [];
@@ -25,29 +26,33 @@ class AuditHistoryService {
   }
 
   Future<void> add({
+    required String userId,
     required Map<String, dynamic> analysis,
     required String address,
     String businessType = '',
+    String flowType = 'old',
   }) async {
-    final history = await load();
+    final history = await load(userId: userId);
     final entry = <String, dynamic>{
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'address': address,
       'businessType': businessType,
+      'flowType': flowType,
       'createdAt': DateTime.now().toIso8601String(),
       'analysis': analysis,
     };
     history.removeWhere((item) => item['address'] == address);
     history.insert(0, entry);
     if (history.length > 30) history.removeRange(30, history.length);
-    await _storage.write(key: _key, value: jsonEncode(history));
+    await _storage.write(key: _keyFor(userId), value: jsonEncode(history));
   }
 
-  Future<void> remove(String id) async {
-    final history = await load();
+  Future<void> remove({required String userId, required String id}) async {
+    final history = await load(userId: userId);
     history.removeWhere((item) => item['id']?.toString() == id);
-    await _storage.write(key: _key, value: jsonEncode(history));
+    await _storage.write(key: _keyFor(userId), value: jsonEncode(history));
   }
 
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<void> clear({required String userId}) =>
+      _storage.delete(key: _keyFor(userId));
 }
