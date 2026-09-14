@@ -18,7 +18,7 @@ typedef AuditCallback =
       required String address,
     });
 
-Future<String?> confirmUserLocation(BuildContext context) async {
+Future<String?> detectUserLocationCity() async {
   String? detectedCity;
   try {
     // Let Android/iOS show its native choices, including "Only this time".
@@ -55,39 +55,7 @@ Future<String?> confirmUserLocation(BuildContext context) async {
   } catch (_) {
     // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
   }
-  if (!context.mounted) return detectedCity;
-  final cityController = TextEditingController(text: detectedCity ?? '');
-  final result = await showDialog<String>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Axtarış şəhəri'),
-      content: TextField(
-        controller: cityController,
-        autofocus: detectedCity == null,
-        textInputAction: TextInputAction.done,
-        decoration: const InputDecoration(
-          labelText: 'Şəhər',
-          hintText: 'Məsələn: Aktau, Bakı, Almatı',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            final city = cityController.text.trim();
-            Navigator.pop(dialogContext, city.isEmpty ? null : city);
-          },
-          child: const Text('Dəyiş'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, cityController.text.trim()),
-          child: const Text('Təsdiqlə'),
-        ),
-      ],
-    ),
-  );
-  cityController.dispose();
-  return result;
+  return detectedCity;
 }
 
 const businessCategoryIds = <String>[

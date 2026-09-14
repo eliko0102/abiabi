@@ -1519,7 +1519,7 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _confirmInitialCity() async {
     if (_locationPromptShown || !mounted) return;
     _locationPromptShown = true;
-    final city = await confirmUserLocation(context);
+    final city = await detectUserLocationCity();
     if (mounted && city != null && city.trim().isNotEmpty) {
       setState(() => _confirmedCity = city.trim());
     }
