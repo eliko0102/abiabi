@@ -118,6 +118,27 @@ export async function suggest2GisAddress(q, city = '') {
     } catch (error) {
       console.warn('2GIS Suggest error:', error.message);
     }
+
+    try {
+      const response = await catalogGet('/3.0/items', {
+        q: query,
+        page_size: 7,
+        fields: 'items.point,items.full_name,items.address_name,items.name,items.adm_div',
+      }, key);
+      const suggestions = itemsFrom(response).map((item) => {
+        const cityDiv = Array.isArray(item.adm_div)
+          ? item.adm_div.find((division) => division?.type === 'city')
+          : null;
+        return {
+          name: item.full_name || item.address_name || item.name,
+          city: cityDiv?.name || city || '',
+          point: pointOf(item),
+        };
+      }).filter((item) => item.name);
+      if (suggestions.length > 0) return suggestions;
+    } catch (error) {
+      console.warn('2GIS Items suggestion error:', error.message);
+    }
   }
 
   try {
