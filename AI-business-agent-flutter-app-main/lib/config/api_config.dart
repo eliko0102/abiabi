@@ -21,7 +21,7 @@ class ApiConfig {
     'MAPS_PROVIDER',
     defaultValue: '2gis',
   );
-  static const twoGisKey = 'f0a2c71a-0aad-4946-80b5-a69eaef9d3fe';
+  static const twoGisKey = 'ae5b1d9f-2f6a-4ce8-9e14-a484259c1acb';
   static const googleMapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
   static const firebaseProjectId = String.fromEnvironment(
     'FIREBASE_PROJECT_ID',

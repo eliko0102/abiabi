@@ -1311,6 +1311,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _restoreSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _confirmInitialCity());
   }
 
   Future<void> _loadAuditHistory() async {
@@ -1513,7 +1514,6 @@ class _HomeShellState extends State<HomeShell> {
       _checkingSession = false;
     });
     _loadAuditHistory();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _confirmInitialCity());
   }
 
   Future<void> _confirmInitialCity() async {
