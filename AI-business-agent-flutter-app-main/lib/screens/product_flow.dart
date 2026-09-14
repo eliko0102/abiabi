@@ -158,17 +158,21 @@ class ProductDashboardScreen extends StatelessWidget {
                             final analysis = audit['analysis'] is Map
                                 ? audit['analysis'] as Map
                                 : const <dynamic, dynamic>{};
-                            final title = (audit['displayAddress'] ??
-                                    audit['address'] ??
-                                    analysis['address'] ??
-                                    t('mapTitle'))
-                                .toString();
+                            final title =
+                                (audit['displayAddress'] ??
+                                        audit['address'] ??
+                                        analysis['address'] ??
+                                        t('mapTitle'))
+                                    .toString();
                             return SizedBox(
                               width: 220,
                               child: _DashboardAuditCard(
                                 address: title,
                                 date: (audit['displayDate'] ?? '').toString(),
                                 onTap: () => onAuditSelected(audit),
+                                onDelete: () =>
+                                    _confirmAuditDelete(context, audit),
+                                deleteLabel: t('deleteAudit'),
                               ),
                             );
                           },
@@ -189,6 +193,30 @@ class ProductDashboardScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmAuditDelete(
+    BuildContext context,
+    Map<String, dynamic> audit,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(FlowLocalizations.t(localeCode, 'deleteAudit')),
+        content: Text(FlowLocalizations.t(localeCode, 'deleteAuditConfirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(FlowLocalizations.t(localeCode, 'cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(FlowLocalizations.t(localeCode, 'deleteAudit')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onAuditDeleted(audit);
   }
 }
 
@@ -305,11 +333,15 @@ class _DashboardAuditCard extends StatelessWidget {
     required this.address,
     required this.date,
     required this.onTap,
+    required this.onDelete,
+    required this.deleteLabel,
   });
 
   final String address;
   final String date;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final String deleteLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -320,24 +352,41 @@ class _DashboardAuditCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              const Icon(Icons.assignment_turned_in_outlined, size: 18),
-              const Spacer(),
-              Text(
-                address,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.assignment_turned_in_outlined, size: 18),
+                  const Spacer(),
+                  Text(
+                    address,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (date.isNotEmpty)
+                    Text(
+                      date,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                ],
               ),
-              if (date.isNotEmpty)
-                Text(
-                  date,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+              Positioned(
+                top: -10,
+                right: -10,
+                child: IconButton(
+                  onPressed: onDelete,
+                  tooltip: deleteLabel,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  visualDensity: VisualDensity.compact,
                 ),
+              ),
             ],
           ),
         ),
@@ -665,7 +714,6 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
       ),
     );
   }
-
 }
 
 class AuditReportScreen extends StatelessWidget {
@@ -709,11 +757,11 @@ class AuditReportScreen extends StatelessWidget {
         ? insights['location_magnets'] as Map
         : <dynamic, dynamic>{};
     final transportStops = analysis?['transport_stops'] is List
-      ? (analysis!['transport_stops'] as List).whereType<Map>().toList()
-      : <Map>[];
+        ? (analysis!['transport_stops'] as List).whereType<Map>().toList()
+        : <Map>[];
     final parking = analysis?['parking'] is List
-      ? (analysis!['parking'] as List).whereType<Map>().toList()
-      : <Map>[];
+        ? (analysis!['parking'] as List).whereType<Map>().toList()
+        : <Map>[];
     final reviewLeaders = noise['leaders'] is List
         ? (noise['leaders'] as List).whereType<Map>().toList()
         : <Map>[];
@@ -794,25 +842,45 @@ class AuditReportScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t('stops'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(
+                      t('stops'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     if (transportStops.isEmpty)
                       Text(_insightText('noStopsData'))
                     else
-                      ...transportStops.take(5).map((item) => Text(
-                        '${item['name'] ?? t('stops')} • ${_formatMeters(item['distance_meters'])}${item['address'] == null || item['address'] == '' ? '' : ' • ${item['address']}'}',
-                        style: const TextStyle(fontSize: 11),
-                      )),
+                      ...transportStops
+                          .take(5)
+                          .map(
+                            (item) => Text(
+                              '${item['name'] ?? t('stops')} • ${_formatMeters(item['distance_meters'])}${item['address'] == null || item['address'] == '' ? '' : ' • ${item['address']}'}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
                     const SizedBox(height: 12),
-                    Text(t('parking'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(
+                      t('parking'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     if (parking.isEmpty)
                       Text(_insightText('noParkingData'))
                     else
-                      ...parking.take(5).map((item) => Text(
-                        '${item['name'] ?? t('parking')} • ${_formatMeters(item['distance_meters'])}${item['capacity'] == null ? '' : ' • ${item['capacity']}'}',
-                        style: const TextStyle(fontSize: 11),
-                      )),
+                      ...parking
+                          .take(5)
+                          .map(
+                            (item) => Text(
+                              '${item['name'] ?? t('parking')} • ${_formatMeters(item['distance_meters'])}${item['capacity'] == null ? '' : ' • ${item['capacity']}'}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
                   ],
                 ),
               ),
@@ -839,10 +907,15 @@ class AuditReportScreen extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: traffic.whereType<Map>().map((item) {
-                            final label = (item['hour'] ?? item['time'] ?? '').toString();
-                            final value = (num.tryParse('${item['value'] ?? item['level'] ?? 0}') ?? 0)
-                                .clamp(0, 1)
-                                .toDouble();
+                            final label = (item['hour'] ?? item['time'] ?? '')
+                                .toString();
+                            final value =
+                                (num.tryParse(
+                                          '${item['value'] ?? item['level'] ?? 0}',
+                                        ) ??
+                                        0)
+                                    .clamp(0, 1)
+                                    .toDouble();
                             return Padding(
                               padding: const EdgeInsets.only(right: 10),
                               child: _TrafficBar(label, value),
@@ -891,10 +964,6 @@ class AuditReportScreen extends StatelessWidget {
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    Text(
-                      '${competitors.length} ${_insightText('nearestPoints')}',
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
                     ),
                     SizedBox(height: 12),
                     if (competitors.isEmpty)
@@ -986,8 +1055,8 @@ class AuditReportScreen extends StatelessWidget {
                           const SizedBox(height: 5),
                           Text(
                             peak['comparison_available'] == true
-                              ? '${_insightText('scheduleNote')} ${_insightText('scheduleAvailable')}'
-                              : _insightText('scheduleUnavailable'),
+                                ? '${_insightText('scheduleNote')} ${_insightText('scheduleAvailable')}'
+                                : _insightText('scheduleUnavailable'),
                             style: TextStyle(
                               color: scheme.outline,
                               fontSize: 10,
@@ -1132,7 +1201,8 @@ class AuditReportScreen extends StatelessWidget {
         'scheduleNote':
             'Real occupancy is calculated when 2GIS data is available.',
         'scheduleAvailable': 'Schedule data is available for comparison.',
-        'scheduleUnavailable': 'No 2GIS schedule data is available for comparison.',
+        'scheduleUnavailable':
+            'No 2GIS schedule data is available for comparison.',
         'locationMagnets': 'Location magnets',
         'magnetSummary':
             'Nearest stop: {transport} m. Nearby traffic place: {place}. Nearest competitor: {competitor} m.',
@@ -1201,9 +1271,9 @@ class AuditReportScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(
+            ListTile(
               leading: Icon(Icons.auto_awesome, color: _accent),
-              title: Text('Спросить ИИ по отчёту'),
+              title: Text(FlowLocalizations.t(localeCode, 'askAiReport')),
             ),
             ListTile(
               leading: const Icon(Icons.map_outlined),
@@ -1545,11 +1615,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       _add(
         'assistant',
         _t('chooseBusiness'),
-        actions: const [
-          ...businessCategoryIds,
-          'otherSector',
-          'otherBusiness',
-        ],
+        actions: const [...businessCategoryIds, 'otherSector', 'otherBusiness'],
       );
     } else if (value == 'otherSector' || value == 'otherBusiness') {
       _mode = 'customBusiness';
@@ -1607,11 +1673,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       _add(
         'assistant',
         _t('selectBusiness'),
-        actions: const [
-          ...businessCategoryIds,
-          'otherSector',
-          'otherBusiness',
-        ],
+        actions: const [...businessCategoryIds, 'otherSector', 'otherBusiness'],
       );
       return;
     }
@@ -1841,9 +1903,7 @@ class _ToggleTile extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => Material(
-    color: selected
-        ? const Color(0xFF24103F)
-        : const Color(0xFF141414),
+    color: selected ? const Color(0xFF24103F) : const Color(0xFF141414),
     borderRadius: BorderRadius.circular(8),
     child: InkWell(
       onTap: onTap,

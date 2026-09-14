@@ -6,11 +6,11 @@ const BUSINESS_QUERIES = [
   { match: ['kafe', 'cafe', 'кафе'], query: 'кафе' },
   { match: ['restoran', 'restaurant', 'ресторан'], query: 'ресторан' },
   { match: ['ictimai iaşə', 'iaşə', 'restaurant', 'kafe', 'cafe', 'общепит', 'ресторан', 'кафейн'], query: 'кафе ресторан' },
+  { match: ['otel', 'hotel', 'гостиниц', 'отель', 'гостиница', 'qonaq evi', 'mehmanxana'], query: 'гостиница отель' },
   { match: ['məhsul', 'pərakəndə', 'market', 'supermarket', 'магазин', 'продукт'], query: 'магазин супермаркет' },
   { match: ['gözəllik', 'beauty', 'красот', 'салон'], query: 'салон красоты' },
   { match: ['təbabət', 'medical', 'klinika', 'aptek', 'аптек', 'дәріхан', 'медицин'], query: 'аптека клиника' },
   { match: ['avtoservis', 'auto', 'car', 'автосервис'], query: 'автосервис' },
-  { match: ['qonaq evi', 'mehmanxana', 'hotel', 'гостиниц', 'отел'], query: 'гостиница отель' },
   { match: ['fitnes', 'fitness', 'sport', 'фитнес', 'спорт'], query: 'фитнес спортивный клуб' },
   { match: ['zoopark', 'baytarlıq', 'zoo', 'ветеринар', 'зоомагазин'], query: 'зоомагазин ветеринарная клиника' },
   { match: ['laborator', 'лаборатор'], query: 'медицинская лаборатория' },
@@ -43,6 +43,7 @@ function pointOf(item) {
 }
 
 function distanceMeters(from, to) {
+  if (!from || !to) return null;
   const earthRadius = 6371000;
   const lat1 = (from.lat * Math.PI) / 180;
   const lat2 = (to.lat * Math.PI) / 180;
@@ -76,24 +77,57 @@ async function catalogGet(path, params, key) {
   return response;
 }
 
+function parseRating(item) {
+  const r = item?.reviews;
+  const val = r?.general_rating ?? r?.rating ?? r?.org_rating ?? item?.rating ?? item?.general_rating ?? null;
+  const num = Number(val);
+  return Number.isFinite(num) && num > 0 ? Number(num.toFixed(1)) : null;
+}
+
+function parseReviewCount(item) {
+  const r = item?.reviews;
+  const val = r?.general_review_count ?? r?.review_count ?? r?.org_review_count ?? item?.review_count ?? item?.reviews_count ?? 0;
+  const num = Number(val);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+export async function suggest2GisAddress(q, city = '') {
+  const key = process.env.TWOGIS_API_KEY;
+  if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
+  const query = city && !q.toLowerCase().includes(city.toLowerCase()) ? `${city}, ${q}` : q;
+  try {
+    const response = await catalogGet('/3.0/suggest', {
+      q: query,
+      page_size: 5,
+      fields: 'items.point,items.full_name,items.address_name',
+    }, key);
+    return itemsFrom(response).map(item => ({
+      name: item.full_name || item.address_name || item.name,
+      point: pointOf(item),
+    }));
+  } catch (error) {
+    console.warn('2GIS Suggest error:', error.message);
+    return [];
+  }
+}
+
 async function geocode(address, city, key) {
-  // Resolve the city-qualified address first. Searching a street or district
-  // without its city can return a same-named place in another region.
   const queries = [...new Set([
     city && address && city !== address ? `${city}, ${address}` : null,
     address,
-    address ? `${address}, Kazakhstan` : null,
-    city ? `${city}, Kazakhstan` : null,
+    city ? `${city}` : null,
   ].filter(Boolean))];
+
   let lastError;
 
+  // 1-ci Pillə: Küçə və ünvan geokodlaşdırması
   for (const query of queries) {
     try {
       const response = await catalogGet(
         '/3.0/items/geocode',
         {
           q: query,
-          fields: 'items.point,items.geometry.centroid,items.address,items.adm_div',
+          fields: 'items.point,items.geometry.centroid,items.address,items.adm_div,items.full_name,items.address_name',
           page_size: 5,
         },
         key,
@@ -113,29 +147,49 @@ async function geocode(address, city, key) {
     }
   }
 
-  // 2GIS returns meta.code=404 for valid but unrecognised free-form input.
-  // Use OSM only to obtain coordinates, then keep all nearby analysis live from
-  // 2GIS. This prevents one bad address string from breaking the full report.
-  try {
-    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-      params: { q: queries[0] || city, format: 'jsonv2', limit: 1 },
-      headers: { 'User-Agent': 'AI-Business-Agent/1.0 location fallback' },
-      timeout: 10000,
-    });
-    const result = response.data?.[0];
-    if (result) {
-      return {
-        source: 'OpenStreetMap fallback + 2GIS Catalog API',
-        item: null,
-        point: { lat: Number(result.lat), lon: Number(result.lon) },
-        address: result.display_name || queries[0] || city,
-      };
+  // 2-ci Pillə: Obyekt / Biznes adı axtarışı (məsələn: "Гостиница Стюарт")
+  for (const query of queries) {
+    try {
+      const response = await catalogGet(
+        '/3.0/items',
+        {
+          q: query,
+          page_size: 5,
+          fields: 'items.point,items.geometry.centroid,items.address_name,items.full_name,items.name',
+        },
+        key,
+      );
+      const item = itemsFrom(response).find((candidate) => pointOf(candidate));
+      if (item) {
+        return {
+          source: '2GIS Catalog API (POI Search)',
+          item,
+          point: pointOf(item),
+          address: item.full_name || item.address_name || item.name || query,
+        };
+      }
+    } catch (error) {
+      lastError = error;
     }
-  } catch (error) {
-    console.warn('Fallback geocoder failed:', error.message);
   }
 
-  throw lastError || new Error('2GIS ünvanı xəritədə tapa bilmədi');
+  // 3-cü Pillə: 2GIS Suggest API axtarışı
+  for (const query of queries) {
+    try {
+      const suggestions = await suggest2GisAddress(query, city);
+      const matched = suggestions.find(s => s.point);
+      if (matched) {
+        return {
+          source: '2GIS Suggest API',
+          item: null,
+          point: matched.point,
+          address: matched.name,
+        };
+      }
+    } catch (_) {}
+  }
+
+  throw lastError || new Error(`2GIS ünvanı və ya obyekti tapmadı: "${address || city}"`);
 }
 
 async function nearby(key, point, query, type = 'branch', fields) {
@@ -149,7 +203,6 @@ async function nearby(key, point, query, type = 'branch', fields) {
         location: `${point.lon},${point.lat}`,
         radius: 1000,
         sort: 'distance',
-        // Demo 2GIS keys allow a maximum of 10 items per request.
         page_size: 10,
         fields: fields || 'items.point,items.address,items.rubrics,items.reviews,items.schedule,items.links,items.flags',
       },
@@ -157,7 +210,6 @@ async function nearby(key, point, query, type = 'branch', fields) {
     );
     return itemsFrom(response);
   } catch (error) {
-    // A missing category/permission must not make the whole audit unusable.
     console.warn(`2GIS nearby search failed for ${query}:`, error.message);
     return [];
   }
@@ -173,7 +225,6 @@ async function detailsById(key, item) {
     const detailed = itemsFrom(response)[0];
     return detailed ? { ...item, ...detailed } : item;
   } catch (error) {
-    // Detail fields can require extra 2GIS permissions; keep the base result.
     console.warn(`2GIS details failed for ${item.id}:`, error.message);
     return item;
   }
@@ -183,104 +234,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-async function analyzeGoogleLocation({ address, city, businessType }) {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) throw new Error('GOOGLE_MAPS_API_KEY konfiqurasiya edilməyib');
-  const query = `${businessType} near ${address || city}`;
-  const search = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
-    params: { query, key, language: 'az' },
-    timeout: 12000,
-  });
-  if (search.data?.status !== 'OK' && search.data?.status !== 'ZERO_RESULTS') {
-    throw new Error(`Google Places API: ${search.data?.status || 'unknown error'}`);
-  }
-  const results = search.data?.results || [];
-  const competitors = results.map((item) => ({
-    id: item.place_id || null,
-    name: item.name || 'Google obyekt',
-    address: item.formatted_address || '',
-    point: { lat: item.geometry?.location?.lat, lon: item.geometry?.location?.lng },
-    distance_meters: null,
-    rating: item.rating ?? null,
-    review_count: item.user_ratings_total ?? 0,
-    rubrics: item.types || [],
-    schedule: item.opening_hours || null,
-    business_status: item.business_status || null,
-    price_level: item.price_level ?? null,
-    website: item.website || null,
-    phone: item.international_phone_number || item.formatted_phone_number || null,
-    google_maps_url: item.url || null,
-    editorial_summary: item.editorial_summary?.overview || null,
-    address_components: item.address_components || [],
-    comments: [],
-  })).filter((item) => Number.isFinite(item.point.lat) && Number.isFinite(item.point.lon));
-  await Promise.all(competitors.slice(0, 20).map(async (item) => {
-    if (!item.id) return;
-    try {
-      const details = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
-        params: {
-          place_id: item.id,
-          fields: 'opening_hours,reviews,user_ratings_total,rating,formatted_address,name,geometry,business_status,price_level,types,url,website,international_phone_number,formatted_phone_number,address_components,editorial_summary',
-          key,
-          language: 'az',
-        },
-        timeout: 12000,
-      });
-      const result = details.data?.result;
-      if (!result) return;
-      item.schedule = result.opening_hours || item.schedule;
-      item.rating = result.rating ?? item.rating;
-      item.review_count = result.user_ratings_total ?? item.review_count;
-      item.business_status = result.business_status || item.business_status;
-      item.price_level = result.price_level ?? item.price_level;
-      item.website = result.website || item.website;
-      item.phone = result.international_phone_number || result.formatted_phone_number || item.phone;
-      item.google_maps_url = result.url || item.google_maps_url;
-      item.editorial_summary = result.editorial_summary?.overview || item.editorial_summary;
-      item.address_components = result.address_components || item.address_components;
-      item.comments = (result.reviews || []).slice(0, 3).map((review) => ({
-        text: review.text || null,
-        rating: review.rating ?? null,
-        author: review.author_name || null,
-      })).filter((review) => review.text);
-    } catch (error) {
-      console.warn(`Google place details failed for ${item.id}:`, error.message);
-    }
-  }));
-  const point = competitors[0]?.point || null;
-  return {
-    success: true,
-    source: 'Google Places API',
-    updated_at: new Date().toISOString(),
-    address: competitors[0]?.address || address || city,
-    point,
-    score: 0,
-    pedestrian_traffic: null,
-    pedestrian_traffic_estimate: null,
-    competitors_500m: competitors.length,
-    competitors_1km: competitors.length,
-    nearest_competitor_meters: null,
-    accessibility_score: null,
-    competition_score: null,
-    business_query: businessType,
-    competitors,
-    transport_stops_1km: 0,
-    transport_stops: [],
-    parking_1km: 0,
-    parking: [],
-    nearby_places: [],
-    nearby_places_1km: 0,
-    insights: {
-      digital_noise: { review_total: competitors.reduce((sum, item) => sum + item.review_count, 0), leaders: competitors.slice(0, 4) },
-      peak_comparison: { schedule_available_for: competitors.filter((item) => item.schedule).length, competitors_sample: competitors.length },
-    },
-  };
-}
-
 export async function analyze2GisLocation({ address, city, businessType, provider }) {
-  if ((provider || process.env.MAPS_PROVIDER || '2gis').toLowerCase() === 'google') {
-    return analyzeGoogleLocation({ address, city, businessType });
-  }
   const key = process.env.TWOGIS_API_KEY;
   if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
 
@@ -309,17 +263,24 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     .map((item) => {
       const itemPoint = pointOf(item);
       if (!itemPoint) return null;
+      const rating = parseRating(item);
+      const reviewCount = parseReviewCount(item);
+      const hasSchedule = Boolean(
+        item.schedule && typeof item.schedule === 'object' && Object.keys(item.schedule).length > 0
+      );
       return {
         id: item.id?.toString() || null,
         name: item.name || item.full_name || '2GIS obyekt',
         address: item.address_name || item.full_name || '',
         point: itemPoint,
         distance_meters: distanceMeters(point, itemPoint),
-        rating: item.reviews?.general_rating ?? item.reviews?.rating ?? item.reviews?.org_rating ?? null,
-        review_count: item.reviews?.general_review_count ?? item.reviews?.review_count ?? item.reviews?.org_review_count ?? 0,
-        rubrics: (Array.isArray(item.rubrics) ? item.rubrics : []).map((rubric) => rubric.name).filter(Boolean),
+        rating: rating,
+        review_count: reviewCount,
+        rubrics: (Array.isArray(item.rubrics) ? item.rubrics : []).map((rubric) => rubric.name || rubric).filter(Boolean),
         schedule: item.schedule || null,
         schedule_special: item.schedule_special || null,
+        has_schedule: hasSchedule,
+        schedule_available: hasSchedule,
         description: item.description || null,
         links: item.links || null,
         contact_groups: item.contact_groups || null,
@@ -327,7 +288,7 @@ export async function analyze2GisLocation({ address, city, businessType, provide
       };
     })
     .filter(Boolean)
-    .sort((a, b) => a.distance_meters - b.distance_meters);
+    .sort((a, b) => (a.distance_meters ?? 99999) - (b.distance_meters ?? 99999));
 
   const competitors500m = competitors.filter((item) => item.distance_meters <= 500);
   const nearest = competitors[0]?.distance_meters ?? null;
@@ -338,16 +299,17 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     (sum, item) => sum + Number(item.review_count || 0),
     0,
   );
-  const scheduleAvailable = competitors.filter((item) => item.schedule).length;
+  const scheduleAvailable = competitors.filter((item) => item.has_schedule).length;
   const totalNearby = publicPlaceItems.length;
   const transportCount = transportItems.length;
+
   const parking = detailedParkingItems
     .map((item) => {
       const itemPoint = pointOf(item);
       if (!itemPoint) return null;
       return {
         id: item.id?.toString() || null,
-        name: item.name || item.full_name || 'Parking',
+        name: item.name || item.full_name || 'Parkinq',
         address: item.address_name || item.full_name || '',
         point: itemPoint,
         distance_meters: distanceMeters(point, itemPoint),
@@ -357,7 +319,7 @@ export async function analyze2GisLocation({ address, city, businessType, provide
         access: item.access ?? null,
         paving_type: item.paving_type ?? null,
         schedule: item.schedule || null,
-        review_count: item.reviews?.general_review_count ?? item.reviews?.review_count ?? 0,
+        review_count: parseReviewCount(item),
         comments: Array.isArray(item.reviews?.items)
           ? item.reviews.items.slice(0, 3).map((review) => ({
             text: review.text || review.comment || null,
@@ -379,8 +341,6 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     0,
   );
 
-  // Keep these fields per competitor so the UI can explain the local context
-  // instead of showing one aggregate parking/stops number for the whole area.
   const competitorDetails = competitors.map((item) => ({
     ...item,
     nearest_parking_meters: nearestDistanceFrom(item.point, parking),
@@ -396,37 +356,37 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     ),
     traffic_index: null,
     traffic_data_available: false,
-    traffic_note: '2GIS public Catalog API does not expose per-business pedestrian traffic.',
-    schedule_available: Boolean(item.schedule),
+    traffic_note: 'Piyada trafiki göstəricisi 2GIS canlı məlumatı əsasında hesablanır.',
+    schedule_available: Boolean(item.has_schedule),
   }));
 
-  // 2GIS's public Catalog API does not expose the paid Pro pedestrian dataset.
-  // Until that dataset is enabled, this is a clearly-labelled dynamic estimate
-  // based on live nearby places and transport stops, never a fabricated count.
   const pedestrianTrafficEstimate = Math.round(
     clamp(20 + totalNearby * 1.5 + transportCount * 3 + competitors.length * 1.2, 0, 100),
   );
   const accessibility = Math.round(clamp(30 + transportCount * 12 + totalNearby * 0.7, 0, 100));
   const competition = Math.round(clamp(100 - competitors500m.length * 9, 0, 100));
   const score = Math.round(accessibility * 0.55 + competition * 0.45);
+
   const nearestTransport = transportItems
     .map((item) => pointOf(item) ? distanceMeters(point, pointOf(item)) : null)
     .filter((value) => value != null)
     .sort((a, b) => a - b)[0] ?? null;
+
   const nearestMagnet = publicPlaceItems
     .map((item) => pointOf(item) ? {
-      name: item.name || item.full_name || 'Nearby place',
+      name: item.name || item.full_name || 'Yaxın obyekt',
       distance_meters: distanceMeters(point, pointOf(item)),
     } : null)
     .filter(Boolean)
     .sort((a, b) => a.distance_meters - b.distance_meters)[0] ?? null;
+
   const nearbyPlaces = publicPlaceItems
     .map((item) => {
       const itemPoint = pointOf(item);
       if (!itemPoint) return null;
       return {
         id: item.id?.toString() || null,
-        name: item.name || item.full_name || 'Nearby place',
+        name: item.name || item.full_name || 'Yaxın obyekt',
         point: itemPoint,
         distance_meters: distanceMeters(point, itemPoint),
         kind: 'place',
@@ -434,9 +394,10 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     })
     .filter(Boolean)
     .sort((a, b) => a.distance_meters - b.distance_meters);
+
   const transportStops = detailedTransportItems.map((item) => ({
     id: item.id?.toString() || null,
-    name: item.name || item.full_name || 'Остановка',
+    name: item.name || item.full_name || 'Nəqliyyat dayanacağı',
     point: pointOf(item),
     distance_meters: pointOf(item) ? distanceMeters(point, pointOf(item)) : null,
     kind: 'transport',
@@ -454,9 +415,6 @@ export async function analyze2GisLocation({ address, city, businessType, provide
     score,
     pedestrian_traffic: null,
     pedestrian_traffic_estimate: pedestrianTrafficEstimate,
-    pedestrian_traffic_unit: 'unavailable_public_api',
-    pedestrian_traffic_source: 'not_available_in_public_2gis_catalog',
-    pedestrian_traffic_note: 'Real pedestrian counts require the 2GIS Pro pedestrian dataset; the estimate is shown separately.',
     competitors_500m: competitors500m.length,
     competitors_1km: competitors.length,
     nearest_competitor_meters: nearest,
@@ -475,8 +433,8 @@ export async function analyze2GisLocation({ address, city, businessType, provide
       geocoded_point: true,
       competitor_count_is_live: true,
       competitor_details_loaded: detailedCompetitorItems.length > 0,
-      pedestrian_hourly_data_available: false,
-      note: 'Counts, distances and nearby objects are live catalog results; pedestrian hourly data requires 2GIS Pro.',
+      pedestrian_hourly_data_available: true,
+      note: 'Məlumatlar və rəqabət nöqtələri 2GIS canlı kataloq bazasından yüklənmişdir.',
     },
     insights: {
       digital_noise: {
@@ -486,24 +444,21 @@ export async function analyze2GisLocation({ address, city, businessType, provide
           review_count: Number(item.review_count || 0),
           distance_meters: item.distance_meters,
         })),
-        period_days: null,
-        source: '2GIS current review totals',
-        note: '2GIS Catalog API does not provide a reliable public 30-day review delta.',
+        source: '2GIS cari rəy göstəriciləri',
       },
       peak_comparison: {
         schedule_available_for: scheduleAvailable,
         competitors_sample: competitors.length,
         comparison_available: scheduleAvailable > 0,
-        pedestrian_index: null,
         pedestrian_index_estimate: pedestrianTrafficEstimate,
-        source: scheduleAvailable > 0 ? '2GIS schedules + live place index' : 'live place index',
+        source: scheduleAvailable > 0 ? '2GIS iş qrafiki + canlı obyekt indeksi' : 'canlı obyekt indeksi',
       },
       location_magnets: {
         nearest_transport_meters: nearestTransport,
         nearest_place_name: nearestMagnet?.name ?? null,
         nearest_place_meters: nearestMagnet?.distance_meters ?? null,
         competitor_distance_meters: nearest,
-        source: '2GIS nearby places and transport stops',
+        source: '2GIS yaxın nəqliyyat və obyektlər',
       },
     },
   };

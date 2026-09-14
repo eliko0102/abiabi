@@ -95,6 +95,53 @@ class AppLocalizations extends InheritedWidget {
       'cancel': 'Ləğv et',
       'deleteAudit': 'Auditi sil',
       'deleteAuditConfirm': 'Bu yadda saxlanılmış auditi silmək istəyirsiniz?',
+      'auditDeleteTooltip': 'Auditi sil',
+      'auditToday': 'Bu gün {time}',
+      'auditYesterday': 'Dünən {time}',
+      'weekdayMonday': 'Bazar ertəsi',
+      'weekdayTuesday': 'Çərşənbə axşamı',
+      'weekdayWednesday': 'Çərşənbə',
+      'weekdayThursday': 'Cümə axşamı',
+      'weekdayFriday': 'Cümə',
+      'weekdaySaturday': 'Şənbə',
+      'weekdaySunday': 'Bazar',
+      'mapSource': 'Xəritə və analiz mənbəyi',
+      'locationAndAnalysis': 'Məkan və analiz',
+      'source': 'Mənbə',
+      'address': 'Ünvan',
+      'updated': 'Yenilənib',
+      'businessQuery': 'Biznes sorğusu',
+      'overallScore': 'Ümumi bal',
+      'accessibilityScore': 'Əlçatanlıq balı',
+      'competitionScore': 'Rəqabət balı',
+      'nearestCompetitor': 'Ən yaxın rəqib',
+      'competitors500m': '500 m rəqib sayı',
+      'competitors1km': '1 km rəqib sayı',
+      'nearbyPlace1km': '1 km yaxın obyekt',
+      'dataQuality': 'Məlumat keyfiyyəti',
+      'geocodedPoint': 'Geokodlaşdırılmış nöqtə',
+      'liveCompetitorCount': 'Canlı rəqib sayı',
+      'detailsLoaded': 'Detallar yüklənib',
+      'hourlyPedestrianData': 'Piyada saatlıq data',
+      'note': 'Qeyd',
+      'trafficAndDigital': 'Trafik və rəqəmsal göstəricilər',
+      'pedestrianTraffic': 'Piyada trafiki',
+      'trafficEstimate': 'Trafik təxmini',
+      'trafficSource': 'Trafik mənbəyi',
+      'trafficNote': 'Trafik qeydi',
+      'totalReviews': 'Ümumi rəy sayı',
+      'scheduledCompetitors': 'Cədvəli olan rəqiblər',
+      'peakComparisonSource': 'Pik müqayisə mənbəyi',
+      'locationMagnets': 'Məkan maqnitləri',
+      'nearestStop': 'Ən yaxın dayanacaq',
+      'nearestPlace': 'Ən yaxın obyekt',
+      'distanceToPlace': 'Obyektə məsafə',
+      'distanceToCompetitor': 'Rəqibə məsafə',
+      'transportStops': 'Nəqliyyat dayanacaqları',
+      'noStopData': 'Dayanacaq məlumatı yoxdur',
+      'nearbyPlaces': 'Yaxın obyektlər',
+      'noNearbyPlaceData': 'Yaxın obyekt məlumatı yoxdur',
+      'noParkingData': 'Parking məlumatı yoxdur',
       'demoAccountHeader': 'Demo Hesab Məlumatları',
       'demoPagesHeader': 'Demo Səhifələr',
       'dashboardTitle': 'Sizə uyğun günə baxış',
@@ -293,6 +340,53 @@ class AppLocalizations extends InheritedWidget {
       'cancel': 'Cancel',
       'deleteAudit': 'Delete audit',
       'deleteAuditConfirm': 'Do you want to delete this saved audit?',
+      'auditDeleteTooltip': 'Delete audit',
+      'auditToday': 'Today {time}',
+      'auditYesterday': 'Yesterday {time}',
+      'weekdayMonday': 'Monday',
+      'weekdayTuesday': 'Tuesday',
+      'weekdayWednesday': 'Wednesday',
+      'weekdayThursday': 'Thursday',
+      'weekdayFriday': 'Friday',
+      'weekdaySaturday': 'Saturday',
+      'weekdaySunday': 'Sunday',
+      'mapSource': 'Map and analysis source',
+      'locationAndAnalysis': 'Location and analysis',
+      'source': 'Source',
+      'address': 'Address',
+      'updated': 'Updated',
+      'businessQuery': 'Business query',
+      'overallScore': 'Overall score',
+      'accessibilityScore': 'Accessibility score',
+      'competitionScore': 'Competition score',
+      'nearestCompetitor': 'Nearest competitor',
+      'competitors500m': 'Competitors within 500 m',
+      'competitors1km': 'Competitors within 1 km',
+      'nearbyPlace1km': 'Nearby places within 1 km',
+      'dataQuality': 'Data quality',
+      'geocodedPoint': 'Geocoded point',
+      'liveCompetitorCount': 'Live competitor count',
+      'detailsLoaded': 'Details loaded',
+      'hourlyPedestrianData': 'Hourly pedestrian data',
+      'note': 'Note',
+      'trafficAndDigital': 'Traffic and digital metrics',
+      'pedestrianTraffic': 'Pedestrian traffic',
+      'trafficEstimate': 'Traffic estimate',
+      'trafficSource': 'Traffic source',
+      'trafficNote': 'Traffic note',
+      'totalReviews': 'Total reviews',
+      'scheduledCompetitors': 'Competitors with schedules',
+      'peakComparisonSource': 'Peak comparison source',
+      'locationMagnets': 'Location magnets',
+      'nearestStop': 'Nearest stop',
+      'nearestPlace': 'Nearest place',
+      'distanceToPlace': 'Distance to place',
+      'distanceToCompetitor': 'Distance to competitor',
+      'transportStops': 'Transport stops',
+      'noStopData': 'No stop data',
+      'nearbyPlaces': 'Nearby places',
+      'noNearbyPlaceData': 'No nearby place data',
+      'noParkingData': 'No parking data',
       'demoAccountHeader': 'Demo account details',
       'demoPagesHeader': 'Demo pages',
       'dashboardSubtitle': 'A clear view of your account and next steps.',
@@ -447,6 +541,53 @@ class AppLocalizations extends InheritedWidget {
       'cancel': 'Отмена',
       'deleteAudit': 'Удалить аудит',
       'deleteAuditConfirm': 'Удалить этот сохраненный аудит?',
+      'auditDeleteTooltip': 'Удалить аудит',
+      'auditToday': 'Сегодня {time}',
+      'auditYesterday': 'Вчера {time}',
+      'weekdayMonday': 'Понедельник',
+      'weekdayTuesday': 'Вторник',
+      'weekdayWednesday': 'Среда',
+      'weekdayThursday': 'Четверг',
+      'weekdayFriday': 'Пятница',
+      'weekdaySaturday': 'Суббота',
+      'weekdaySunday': 'Воскресенье',
+      'mapSource': 'Источник карты и анализа',
+      'locationAndAnalysis': 'Место и анализ',
+      'source': 'Источник',
+      'address': 'Адрес',
+      'updated': 'Обновлено',
+      'businessQuery': 'Запрос бизнеса',
+      'overallScore': 'Общий балл',
+      'accessibilityScore': 'Балл доступности',
+      'competitionScore': 'Балл конкуренции',
+      'nearestCompetitor': 'Ближайший конкурент',
+      'competitors500m': 'Конкуренты в радиусе 500 м',
+      'competitors1km': 'Конкуренты в радиусе 1 км',
+      'nearbyPlace1km': 'Объекты в радиусе 1 км',
+      'dataQuality': 'Качество данных',
+      'geocodedPoint': 'Геокодированная точка',
+      'liveCompetitorCount': 'Количество актуальных конкурентов',
+      'detailsLoaded': 'Детали загружены',
+      'hourlyPedestrianData': 'Почасовые данные о пешеходах',
+      'note': 'Примечание',
+      'trafficAndDigital': 'Трафик и цифровые показатели',
+      'pedestrianTraffic': 'Пешеходный трафик',
+      'trafficEstimate': 'Оценка трафика',
+      'trafficSource': 'Источник трафика',
+      'trafficNote': 'Примечание о трафике',
+      'totalReviews': 'Общее количество отзывов',
+      'scheduledCompetitors': 'Конкуренты с графиком',
+      'peakComparisonSource': 'Источник сравнения пиков',
+      'locationMagnets': 'Магниты локации',
+      'nearestStop': 'Ближайшая остановка',
+      'nearestPlace': 'Ближайший объект',
+      'distanceToPlace': 'Расстояние до объекта',
+      'distanceToCompetitor': 'Расстояние до конкурента',
+      'transportStops': 'Транспортные остановки',
+      'noStopData': 'Нет данных об остановках',
+      'nearbyPlaces': 'Ближайшие объекты',
+      'noNearbyPlaceData': 'Нет данных о ближайших объектах',
+      'noParkingData': 'Нет данных о парковке',
       'demoAccountHeader': 'Данные демо-аккаунта',
       'demoPagesHeader': 'Демо страницы',
       'dashboardTitle': 'Обзор на сегодня',
@@ -627,6 +768,53 @@ class AppLocalizations extends InheritedWidget {
       'cancel': 'Бас тарту',
       'deleteAudit': 'Аудитті өшіру',
       'deleteAuditConfirm': 'Бұл сақталған аудитті өшіру керек пе?',
+      'auditDeleteTooltip': 'Аудитті өшіру',
+      'auditToday': 'Бүгін {time}',
+      'auditYesterday': 'Кеше {time}',
+      'weekdayMonday': 'Дүйсенбі',
+      'weekdayTuesday': 'Сейсенбі',
+      'weekdayWednesday': 'Сәрсенбі',
+      'weekdayThursday': 'Бейсенбі',
+      'weekdayFriday': 'Жұма',
+      'weekdaySaturday': 'Сенбі',
+      'weekdaySunday': 'Жексенбі',
+      'mapSource': 'Карта және талдау көзі',
+      'locationAndAnalysis': 'Орын және талдау',
+      'source': 'Дереккөзі',
+      'address': 'Мекенжай',
+      'updated': 'Жаңартылды',
+      'businessQuery': 'Бизнес сұрағы',
+      'overallScore': 'Жалпы балл',
+      'accessibilityScore': 'Қолжетімділік балы',
+      'competitionScore': 'Бәсекелестік балы',
+      'nearestCompetitor': 'Ең жақын бәсекелес',
+      'competitors500m': '500 м ішіндегі бәсекелестер',
+      'competitors1km': '1 км ішіндегі бәсекелестер',
+      'nearbyPlace1km': '1 км ішіндегі нысандар',
+      'dataQuality': 'Дерек сапасы',
+      'geocodedPoint': 'Геокодталған нүкте',
+      'liveCompetitorCount': 'Нақты бәсекелестер саны',
+      'detailsLoaded': 'Мәліметтер жүктелді',
+      'hourlyPedestrianData': 'Сағаттық жаяу жүргінші дерегі',
+      'note': 'Ескерту',
+      'trafficAndDigital': 'Трафик және цифрлық көрсеткіштер',
+      'pedestrianTraffic': 'Жаяу жүргінші ағыны',
+      'trafficEstimate': 'Трафик болжамы',
+      'trafficSource': 'Трафик көзі',
+      'trafficNote': 'Трафик ескертпесі',
+      'totalReviews': 'Жалпы пікір саны',
+      'scheduledCompetitors': 'Кестесі бар бәсекелестер',
+      'peakComparisonSource': 'Қарбалас уақыт салыстыру көзі',
+      'locationMagnets': 'Орын магниттері',
+      'nearestStop': 'Ең жақын аялдама',
+      'nearestPlace': 'Ең жақын нысан',
+      'distanceToPlace': 'Нысанға дейінгі қашықтық',
+      'distanceToCompetitor': 'Бәсекелеске дейінгі қашықтық',
+      'transportStops': 'Көлік аялдамалары',
+      'noStopData': 'Аялдама дерегі жоқ',
+      'nearbyPlaces': 'Жақын нысандар',
+      'noNearbyPlaceData': 'Жақын нысандар дерегі жоқ',
+      'noParkingData': 'Тұрақ дерегі жоқ',
       'demoAccountHeader': 'Демо есеп жазба деректері',
       'demoPagesHeader': 'Демо беттер',
       'dashboardTitle': 'Бүгінгі шолу',
@@ -1041,6 +1229,7 @@ class LocationAnalysisController extends ChangeNotifier {
     String address = '',
   }) async {
     isAnalyzing = true;
+    analysis = null;
     notifyListeners();
     try {
       analysis = await _service.analyze2GisLocation(
@@ -1049,6 +1238,9 @@ class LocationAnalysisController extends ChangeNotifier {
         address: address,
         mapProvider: mapProvider,
       );
+    } catch (e) {
+      analysis = null;
+      rethrow;
     } finally {
       isAnalyzing = false;
       notifyListeners();
@@ -1057,28 +1249,6 @@ class LocationAnalysisController extends ChangeNotifier {
 
   Future<void> analyzeFromPrompt(String prompt) async {
     final normalized = prompt.toLowerCase();
-    const locationSignals = [
-      'məkan',
-      'ünvan',
-      'şəhər',
-      'biznes',
-      'kafe',
-      'restoran',
-      'rəqib',
-      'trafik',
-      'место',
-      'адрес',
-      'город',
-      'бизнес',
-      'кафе',
-      'конкурент',
-      'трафик',
-      'орын',
-      'қала',
-      'бәсекелес',
-    ];
-    if (!locationSignals.any(normalized.contains)) return;
-
     const cities = ['Astana', 'Almaty', 'Shymkent', 'Aktau'];
     final city = cities.firstWhere(
       (item) => normalized.contains(item.toLowerCase()),
@@ -1152,14 +1322,14 @@ class _HomeShellState extends State<HomeShell> {
       return {
         ...item,
         'displayAddress': address,
-        'displayDate': _formatAuditDate(createdAt),
+        'displayDate': _formatAuditDate(createdAt, widget.currentLocaleCode),
         'status': 'Hazır',
       };
     }).toList();
     setState(() => _auditHistory = processedHistory);
   }
 
-  String _formatAuditDate(String createdAt) {
+  String _formatAuditDate(String createdAt, String localeCode) {
     if (createdAt.isEmpty) return '';
     try {
       final date = DateTime.parse(createdAt);
@@ -1167,23 +1337,41 @@ class _HomeShellState extends State<HomeShell> {
       final difference = now.difference(date);
       final time =
           '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      if (difference.inDays == 0) return 'Bugün $time';
-      if (difference.inDays == 1) return 'Dünən $time';
+      if (difference.inDays == 0) {
+        return AppLocalizations.translate(
+          localeCode,
+          'auditToday',
+        ).replaceAll('{time}', time);
+      }
+      if (difference.inDays == 1) {
+        return AppLocalizations.translate(
+          localeCode,
+          'auditYesterday',
+        ).replaceAll('{time}', time);
+      }
       if (difference.inDays < 7) {
-        const days = [
-          'Bazar ertəsi',
-          'Çərşənbə axşamı',
-          'Çərşənbə',
-          'Cümə axşamı',
-          'Cümə',
-          'Şənbə',
-          'Bazar',
+        const weekdayKeys = [
+          'weekdayMonday',
+          'weekdayTuesday',
+          'weekdayWednesday',
+          'weekdayThursday',
+          'weekdayFriday',
+          'weekdaySaturday',
+          'weekdaySunday',
         ];
-        return '${days[date.weekday - 1]} $time';
+        return '${AppLocalizations.translate(localeCode, weekdayKeys[date.weekday - 1])} $time';
       }
       return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
     } catch (_) {
       return createdAt;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentLocaleCode != widget.currentLocaleCode) {
+      _loadAuditHistory();
     }
   }
 
@@ -3749,6 +3937,7 @@ class _MapAnalysisDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final data = analysis;
     if (data == null) return const SizedBox.shrink();
     final quality = data['analysis_quality'] is Map
@@ -3770,69 +3959,75 @@ class _MapAnalysisDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _section('Məkan və analiz', [
-          _line('Mənbə', data['source']),
-          _line('Ünvan', data['address']),
-          _line('Yenilənib', data['updated_at']),
-          _line('Biznes sorğusu', data['business_query']),
-          _line('Ümumi bal', data['score']),
-          _line('Əlçatanlıq balı', data['accessibility_score']),
-          _line('Rəqabət balı', data['competition_score']),
-          _line('Ən yaxın rəqib', _distance(data['nearest_competitor_meters'])),
-          _line('500 m rəqib sayı', data['competitors_500m']),
-          _line('1 km rəqib sayı', data['competitors_1km']),
-          _line('1 km yaxın obyekt', data['nearby_places_1km']),
-        ]),
-        _section('Məlumat keyfiyyəti', [
-          _line('Geokodlaşdırılmış nöqtə', quality['geocoded_point']),
-          _line('Canlı rəqib sayı', quality['competitor_count_is_live']),
-          _line('Detallar yüklənib', quality['competitor_details_loaded']),
+        _section(loc.t('locationAndAnalysis'), [
+          _line(loc.t('source'), data['source']),
+          _line(loc.t('address'), data['address']),
+          _line(loc.t('updated'), data['updated_at']),
+          _line(loc.t('businessQuery'), data['business_query']),
+          _line(loc.t('overallScore'), data['score']),
+          _line(loc.t('accessibilityScore'), data['accessibility_score']),
+          _line(loc.t('competitionScore'), data['competition_score']),
           _line(
-            'Piyada saatlıq data',
+            loc.t('nearestCompetitor'),
+            _distance(data['nearest_competitor_meters']),
+          ),
+          _line(loc.t('competitors500m'), data['competitors_500m']),
+          _line(loc.t('competitors1km'), data['competitors_1km']),
+          _line(loc.t('nearbyPlace1km'), data['nearby_places_1km']),
+        ]),
+        _section(loc.t('dataQuality'), [
+          _line(loc.t('geocodedPoint'), quality['geocoded_point']),
+          _line(
+            loc.t('liveCompetitorCount'),
+            quality['competitor_count_is_live'],
+          ),
+          _line(loc.t('detailsLoaded'), quality['competitor_details_loaded']),
+          _line(
+            loc.t('hourlyPedestrianData'),
             quality['pedestrian_hourly_data_available'],
           ),
-          _line('Qeyd', quality['note']),
+          _line(loc.t('note'), quality['note']),
         ]),
-        _section('Trafik və rəqəmsal göstəricilər', [
-          _line('Piyada trafiki', data['pedestrian_traffic']),
-          _line('Trafik təxmini', data['pedestrian_traffic_estimate']),
-          _line('Trafik mənbəyi', data['pedestrian_traffic_source']),
-          _line('Trafik qeydi', data['pedestrian_traffic_note']),
-          _line('Ümumi rəy sayı', noise['review_total']),
+        _section(loc.t('trafficAndDigital'), [
+          _line(loc.t('pedestrianTraffic'), data['pedestrian_traffic']),
+          _line(loc.t('trafficEstimate'), data['pedestrian_traffic_estimate']),
+          _line(loc.t('trafficSource'), data['pedestrian_traffic_source']),
+          _line(loc.t('trafficNote'), data['pedestrian_traffic_note']),
+          _line(loc.t('totalReviews'), noise['review_total']),
           _line(
-            'Cədvəli olan rəqiblər',
+            loc.t('scheduledCompetitors'),
             '${peak['schedule_available_for'] ?? '—'}/${peak['competitors_sample'] ?? '—'}',
           ),
-          _line('Pik müqayisə mənbəyi', peak['source']),
+          _line(loc.t('peakComparisonSource'), peak['source']),
         ]),
-        _section('Məkan maqnitləri', [
+        _section(loc.t('locationMagnets'), [
           _line(
-            'Ən yaxın dayanacaq',
+            loc.t('nearestStop'),
             _distance(magnets['nearest_transport_meters']),
           ),
-          _line('Ən yaxın obyekt', magnets['nearest_place_name']),
-          _line('Obyektə məsafə', _distance(magnets['nearest_place_meters'])),
+          _line(loc.t('nearestPlace'), magnets['nearest_place_name']),
           _line(
-            'Rəqibə məsafə',
+            loc.t('distanceToPlace'),
+            _distance(magnets['nearest_place_meters']),
+          ),
+          _line(
+            loc.t('distanceToCompetitor'),
             _distance(magnets['competitor_distance_meters']),
           ),
         ]),
         _section(
-          'Nəqliyyat dayanacaqları',
-          _places(
-            data['transport_stops'],
-            emptyLabel: 'Dayanacaq məlumatı yoxdur',
-          ),
+          loc.t('transportStops'),
+          _places(data['transport_stops'], emptyLabel: loc.t('noStopData')),
         ),
         _section(
-          'Parking',
-          _places(data['parking'], emptyLabel: 'Parking məlumatı yoxdur'),
+          loc.t('parking'),
+          _places(data['parking'], emptyLabel: loc.t('noParkingData')),
         ),
         _section(
-          'Yaxın obyektlər',
+          loc.t('nearbyPlaces'),
           _places(
             data['nearby_places'],
-            emptyLabel: 'Yaxın obyekt məlumatı yoxdur',
+            emptyLabel: loc.t('noNearbyPlaceData'),
           ),
         ),
       ],
@@ -4064,7 +4259,6 @@ class _MapCompetitorRow extends StatelessWidget {
               item['editorial_summary'] != null ||
               item['description'] != null ||
               item['schedule_special'] != null ||
-              item['links'] != null ||
               item['contact_groups'] != null ||
               item['flags'] != null) ...[
             const SizedBox(height: 6),
@@ -4081,7 +4275,6 @@ class _MapCompetitorRow extends StatelessWidget {
                 if (item['description'] != null) item['description'].toString(),
                 if (item['schedule_special'] != null)
                   'Xüsusi qrafik: ${item['schedule_special']}',
-                if (item['links'] != null) 'Linklər: ${item['links']}',
                 if (item['contact_groups'] != null)
                   'Əlaqə: ${item['contact_groups']}',
                 if (item['flags'] is List && (item['flags'] as List).isNotEmpty)
@@ -4706,7 +4899,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           DropdownButtonFormField<String>(
             value: widget.mapProvider,
             decoration: InputDecoration(
-              labelText: 'Xəritə və analiz mənbəyi',
+              labelText: loc.t('mapSource'),
               labelStyle: TextStyle(color: mutedColor, fontSize: 12),
             ),
             items: const [
@@ -4896,7 +5089,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             IconButton(
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline, size: 18),
-              tooltip: 'Auditi sil',
+              tooltip: AppLocalizations.translate(
+                widget.currentLocaleCode,
+                'auditDeleteTooltip',
+              ),
               color: muted,
               visualDensity: VisualDensity.compact,
             ),

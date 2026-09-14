@@ -20,6 +20,10 @@ class FlowLocalizations {
       'otherBusiness': 'Başqa biznes...',
       'otherProblem': 'Digər problem...',
       'close': 'Bağla',
+      'cancel': 'Ləğv et',
+      'deleteAudit': 'Auditi sil',
+      'deleteAuditConfirm': 'Bu yadda saxlanılmış auditi silmək istəyirsiniz?',
+      'askAiReport': 'Hesabat barədə AI-dan soruş',
       'auditStart': 'AUDİTƏ BAŞLA →',
       'auditLoading': 'Audit hazırlanır...',
       'freeAuditNote':
@@ -96,6 +100,10 @@ class FlowLocalizations {
       'otherBusiness': 'Other business...',
       'otherProblem': 'Other problem...',
       'close': 'Close',
+      'cancel': 'Cancel',
+      'deleteAudit': 'Delete audit',
+      'deleteAuditConfirm': 'Do you want to delete this saved audit?',
+      'askAiReport': 'Ask AI about the report',
       'auditStart': 'START AUDIT →',
       'auditLoading': 'Preparing audit...',
       'freeAuditNote':
@@ -172,6 +180,10 @@ class FlowLocalizations {
       'otherBusiness': 'Другой бизнес...',
       'otherProblem': 'Другая проблема...',
       'close': 'Закрыть',
+      'cancel': 'Отмена',
+      'deleteAudit': 'Удалить аудит',
+      'deleteAuditConfirm': 'Удалить этот сохранённый аудит?',
+      'askAiReport': 'Спросить ИИ по отчёту',
       'auditStart': 'НАЧАТЬ АУДИТ →',
       'auditLoading': 'Аудит готовится...',
       'freeAuditNote':
@@ -247,6 +259,10 @@ class FlowLocalizations {
       'otherBusiness': 'Басқа бизнес...',
       'otherProblem': 'Басқа мәселе...',
       'close': 'Жабу',
+      'cancel': 'Болдырмау',
+      'deleteAudit': 'Аудитті өшіру',
+      'deleteAuditConfirm': 'Бұл сақталған аудитті өшіру керек пе?',
+      'askAiReport': 'Есеп туралы AI-дан сұрау',
       'auditStart': 'АУДИТТІ БАСТАУ →',
       'auditLoading': 'Аудит дайындалуда...',
       'freeAuditNote':

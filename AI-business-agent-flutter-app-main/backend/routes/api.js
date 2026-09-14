@@ -1,11 +1,10 @@
 import express from 'express';
 import axios from 'axios';
-import { analyze2GisLocation } from '../services/twogis.js';
+import { analyze2GisLocation, suggest2GisAddress } from '../services/twogis.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Chat endpoint supports guests; other analysis endpoints remain protected.
 router.post('/chat', async (req, res) => {
   try {
     const { prompt, location_context: locationContext, language = 'az' } = req.body;
@@ -29,45 +28,49 @@ router.post('/chat', async (req, res) => {
 
     const languageNames = { az: 'Azerbaijani', en: 'English', ru: 'Russian', kk: 'Kazakh' };
     const responseLanguage = languageNames[language] || languageNames.az;
-    const contextText = locationContext
-      ? `\n\nCurrent live 2GIS location analysis:\n${JSON.stringify(locationContext)}`
-      : '';
-    const groundedPrompt = `Respond in ${responseLanguage}. Keep the answer concise and useful.\n\n${prompt}${contextText}`;
 
-    // Call Gemini API
+    // AI Məsləhətçi üçün yenilənmiş Sistem Təlimatı (System Prompt)
+    const systemInstructionText = `Sən yerli bizneslər, məkan analitikası və piyada trafikinin (insan axınının) artırılması üzrə ekspert Süni İntellekt Məsləhətçisisən (Tochka.ai Business Agent).
+İstifadəçiyə ${responseLanguage} dilində cavab ver.
+
+Sənin əsas vəzifələrin:
+1. Ümumi, faydasız və ya nəzəri sözlər DEDİRMƏMƏK. Mütləq praktiki, icra oluna bilən (actionable) konkret biznes tövsiyələri vermək.
+2. Mövcud və ya yeni bizneslər üçün piyada trafikini (insan axınını) artırmaq üzrə addım-addım strategiya təklif etmək (məsələn: 2GIS rəqəmsal reklam/pin, yaxın nəqliyyat dayanacaqlarından axını tutmaq, rəqiblərin zəif tərəflərindən istifadə, vizual giriş görünürlüyü).
+3. Əgər daxil olan sorğuda canlı 2GIS məkan analitikası (locationContext) varsa, mütləq həmin ünvanı, rəqib sayını, parkinq və nəqliyyat göstəricilərini əsas gətirərək təhlil aparmaq.
+
+Cavabın mütləq aşağıdakı strukturu izləməlidir:
+- **Məkanın Cari Qiymətləndirilməsi:** Ünvan, əlçatanlıq balı və rəqabət vəziyyəti.
+- **Piyada Trafikini (İnsan Axınını) Artırmaq Üçün 3 Konkret Addım:** Biznes sahibinin dərhal tətbiq edə biləcəyi praktiki həllər.
+- **Risklərin Və Çatışmazlıqların Həlli:** Parkinq, görünürlük və ya rəqabət problemlərini necə aradan qaldırmalı.`;
+
+    let contextText = '';
+    if (locationContext && typeof locationContext === 'object') {
+      contextText = `\n\nCANLI 2GIS MƏKAN ANALİTİKASI MƏLUMATLARI:\n${JSON.stringify(locationContext, null, 2)}`;
+    }
+
+    const fullPrompt = `${systemInstructionText}\n\nİSTİFADƏÇİ SORĞUSU: ${prompt}${contextText}`;
+
     if (provider === 'gemini') {
       try {
         const geminiResponse = await axios.post(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
           {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: groundedPrompt,
-                  },
-                ],
-              },
-            ],
+            contents: [{ parts: [{ text: fullPrompt }] }],
           },
           {
-            params: {
-              key: apiKey,
-            },
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            params: { key: apiKey },
+            headers: { 'Content-Type': 'application/json' },
           }
         );
 
         const aiMessage =
           geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-          'AI could not generate response';
+          'Süni intellekt cavab yarada bilmədi.';
 
         return res.status(200).json({
           success: true,
           message: aiMessage,
-          prompt: groundedPrompt,
+          prompt: fullPrompt,
           provider: provider,
           userId: req.user?.id || null,
         });
@@ -75,34 +78,43 @@ router.post('/chat', async (req, res) => {
         console.error('Gemini API Error:', apiError.response?.data || apiError.message);
         return res.status(500).json({
           success: false,
-          message: 'Error calling Gemini API',
+          message: 'Gemini API sorğusunda xəta baş verdi',
           error: apiError.response?.data?.error?.message || apiError.message,
         });
       }
     }
 
-    // Fallback response
-    const response = {
+    res.status(200).json({
       success: true,
-      message: 'Chat endpoint is ready',
-      prompt: groundedPrompt,
+      message: 'Chat endpoint hazırdır',
+      prompt: fullPrompt,
       provider: provider,
       userId: req.user?.id || null,
-    };
-
-    res.status(200).json(response);
+    });
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error processing chat',
+      message: 'Çat emal edilərkən xəta baş verdi',
       error: error.message,
     });
   }
 });
 
-// Location analysis endpoint. It is intentionally usable by guest chat so the
-// user can discover a location before deciding to create an account.
+router.get('/suggest', async (req, res) => {
+  try {
+    const { q, city } = req.query;
+    if (!q) {
+      return res.status(400).json({ success: false, message: 'q parametri tələb olunur' });
+    }
+    const suggestions = await suggest2GisAddress(q, city);
+    res.status(200).json({ success: true, suggestions });
+  } catch (error) {
+    console.error('Suggest error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.post('/location-analysis', async (req, res) => {
   try {
     const { city, businessType, address, mapProvider } = req.body;
@@ -111,7 +123,7 @@ router.post('/location-analysis', async (req, res) => {
     if (!city || !businessType) {
       return res.status(400).json({
         success: false,
-        message: 'City and businessType are required',
+        message: 'City və businessType tələb olunur',
       });
     }
 
@@ -133,44 +145,7 @@ router.post('/location-analysis', async (req, res) => {
     console.error('Location analysis error:', error);
     res.status(500).json({
       success: false,
-      message: 'Location analysis failed',
-      error: error.message,
-    });
-  }
-});
-
-// ROI calculation endpoint
-router.post('/roi', verifyToken, async (req, res) => {
-  try {
-    const { rent, averageTicket, margin = 0.35 } = req.body;
-
-    if (!rent || !averageTicket) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rent and averageTicket are required',
-      });
-    }
-
-    // Simple ROI calculation
-    const monthlyRevenue = averageTicket * 30; // Assuming 30 transactions per day
-    const monthlyProfit = monthlyRevenue * margin - rent;
-    const roi = (monthlyProfit / rent) * 100;
-
-    const response = {
-      success: true,
-      message: 'ROI calculated successfully',
-      monthlyRevenue,
-      monthlyProfit,
-      roi: roi.toFixed(2),
-      userId: req.user.id,
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('ROI calculation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error calculating ROI',
+      message: error.message || 'Analiz zamanı xəta baş verdi',
       error: error.message,
     });
   }
