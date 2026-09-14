@@ -21,13 +21,14 @@ typedef AuditCallback =
 Future<String?> confirmUserLocation(BuildContext context) async {
   String? detectedCity;
   try {
-    if (await Geolocator.isLocationServiceEnabled()) {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission != LocationPermission.denied &&
-          permission != LocationPermission.deniedForever) {
+    // Let Android/iOS show its native choices, including "Only this time".
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission != LocationPermission.denied &&
+        permission != LocationPermission.deniedForever &&
+        await Geolocator.isLocationServiceEnabled()) {
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
@@ -50,7 +51,6 @@ Future<String?> confirmUserLocation(BuildContext context) async {
             detectedCity = city.toString().trim();
           }
         }
-      }
     }
   } catch (_) {
     // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
