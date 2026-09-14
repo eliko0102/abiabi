@@ -85,8 +85,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
         _hasSearched = true;
       });
       try {
+        final queryHasCity = query.contains(',');
+        final searchCity = queryHasCity ? '' : widget.city;
         final uri = Uri.parse(
-          '${ApiConfig.backendUrl}/api/suggest?q=${Uri.encodeComponent(query)}&city=${Uri.encodeComponent(widget.city)}',
+          '${ApiConfig.backendUrl}/api/suggest?q=${Uri.encodeComponent(query)}&city=${Uri.encodeComponent(searchCity)}',
         );
         final res = await http.get(uri).timeout(const Duration(seconds: 10));
         var results = <Map<String, dynamic>>[];
@@ -97,7 +99,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
 
         if (results.isEmpty) {
           final osmUri = Uri.https('nominatim.openstreetmap.org', '/search', {
-            'q': widget.city.isNotEmpty ? '${widget.city}, $query' : query,
+            'q': searchCity.isNotEmpty ? '$searchCity, $query' : query,
             'format': 'jsonv2',
             'limit': '5',
           });
@@ -111,7 +113,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
             final osmData = jsonDecode(osmRes.body) as List;
             results = osmData.map<Map<String, dynamic>>((item) => {
               'name': item['display_name'],
-              'city': widget.city,
+              'city': searchCity,
               'lat': item['lat'],
               'lon': item['lon'],
             }).toList();

@@ -3265,6 +3265,39 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _searchNominatim(String query) async {
+    final scopedQuery = query.contains(',') || widget.city.isEmpty
+        ? query
+        : '${widget.city}, $query';
+    final queries = <String>{
+      scopedQuery,
+      query,
+      if (widget.city.isNotEmpty) widget.city,
+    };
+    for (final candidate in queries) {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'q': candidate,
+        'format': 'jsonv2',
+        'limit': '5',
+      });
+      final response = await http
+          .get(
+            uri,
+            headers: const {
+              'User-Agent': 'AI-Business-Agent/1.0 (address search)',
+              'Accept-Language': 'az,en,ru',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) continue;
+      final decoded = jsonDecode(response.body);
+      if (decoded is List && decoded.isNotEmpty) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return const [];
+  }
+
   Future<void> _searchAddress() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
@@ -3297,24 +3330,9 @@ class _MapScreenState extends State<MapScreen> {
     } catch (_) {
       // Keep OSM as a fallback when the backend/key is unavailable.
       try {
-        final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-          'q': widget.city.isNotEmpty ? '${widget.city}, $query' : query,
-          'format': 'jsonv2',
-          'limit': '1',
-        });
-        final response = await http
-            .get(
-              uri,
-              headers: {
-                'User-Agent': 'AI-Business-Agent/1.0 (address search)',
-                'Accept-Language': 'az,en',
-              },
-            )
-            .timeout(const Duration(seconds: 10));
-        if (response.statusCode != 200) throw Exception('Search failed');
-        final results = jsonDecode(response.body) as List<dynamic>;
+        final results = await _searchNominatim(query);
         if (results.isEmpty) throw Exception('Address not found');
-        final result = results.first as Map<String, dynamic>;
+        final result = results.first;
         final lat = double.parse(result['lat'].toString());
         final lon = double.parse(result['lon'].toString());
         final pin = _CityPin(

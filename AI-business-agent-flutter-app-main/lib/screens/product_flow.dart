@@ -19,7 +19,7 @@ typedef AuditCallback =
     });
 
 Future<String?> confirmUserLocation(BuildContext context) async {
-  var detectedCity = 'Bakı';
+  String? detectedCity;
   try {
     if (await Geolocator.isLocationServiceEnabled()) {
       var permission = await Geolocator.checkPermission();
@@ -45,11 +45,10 @@ Future<String?> confirmUserLocation(BuildContext context) async {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           final address = data['address'] as Map<String, dynamic>? ?? {};
-          detectedCity = (address['city'] ??
-                  address['town'] ??
-                  address['state'] ??
-                  detectedCity)
-              .toString();
+          final city = address['city'] ?? address['town'] ?? address['municipality'];
+          if (city != null && city.toString().trim().isNotEmpty) {
+            detectedCity = city.toString().trim();
+          }
         }
       }
     }
@@ -57,15 +56,20 @@ Future<String?> confirmUserLocation(BuildContext context) async {
     // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
   }
   if (!context.mounted) return detectedCity;
-  final cityController = TextEditingController(text: detectedCity);
+  final cityController = TextEditingController(text: detectedCity ?? '');
   final result = await showDialog<String>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Cari Şəhəriniz'),
+      title: const Text('Axtarış şəhəri'),
       content: TextField(
         controller: cityController,
-        decoration: const InputDecoration(labelText: 'Şəhər'),
+        autofocus: detectedCity == null,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'Şəhər',
+          hintText: 'Məsələn: Aktau, Bakı, Almatı',
+        ),
       ),
       actions: [
         TextButton(

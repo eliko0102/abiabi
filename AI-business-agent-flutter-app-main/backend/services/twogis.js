@@ -94,7 +94,7 @@ function parseReviewCount(item) {
 export async function suggest2GisAddress(q, city = '') {
   const key = process.env.TWOGIS_API_KEY;
   const normalizedQuery = q.trim();
-  const query = city && !normalizedQuery.toLowerCase().includes(city.toLowerCase())
+  const query = city && !normalizedQuery.includes(',') && !normalizedQuery.toLowerCase().includes(city.toLowerCase())
     ? `${city}, ${normalizedQuery}`
     : normalizedQuery;
   if (key) {
