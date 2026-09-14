@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/ai_service.dart';
+import '../widgets/address_autocomplete_field.dart';
 import 'flow_localizations.dart';
 
 const _accent = Color(0xFF8E44FF);
@@ -644,14 +645,11 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
+              child: AddressAutocompleteField(
                 controller: _addressController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.location_on_outlined),
-                  hintText: t('addressHint'),
-                  suffixIcon: Icon(Icons.map_outlined),
-                ),
+                hintText: t('addressHint'),
+                isBottomInput: true,
+                onSelected: (_) => setState(() {}),
               ),
             ),
           ),
@@ -1813,10 +1811,12 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: AddressAutocompleteField(
                     controller: _inputController,
-                    onSubmitted: (_) => _send(),
-                    decoration: InputDecoration(hintText: _t('chatHint')),
+                    hintText: _t('chatHint'),
+                    isBottomInput: true,
+                    onSelected: (_) => _send(),
+                    onSubmitted: _send,
                   ),
                 ),
                 const SizedBox(width: 8),

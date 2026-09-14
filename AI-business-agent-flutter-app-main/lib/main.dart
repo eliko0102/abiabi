@@ -20,6 +20,7 @@ import 'services/business_api_service.dart';
 import 'services/audit_history_service.dart';
 import 'config/api_config.dart';
 import 'screens/product_flow.dart';
+import 'widgets/address_autocomplete_field.dart';
 
 void main() {
   runApp(const AiBusinessAgentApp());
@@ -3379,37 +3380,12 @@ class _MapScreenState extends State<MapScreen> {
                   elevation: 4,
                   borderRadius: BorderRadius.circular(25),
                   color: dark ? const Color(0xFF18181B) : Colors.white,
-                  child: TextField(
+                  child: AddressAutocompleteField(
                     controller: _searchController,
-                    onChanged: (value) => setState(() => _search = value),
-                    onSubmitted: (_) => _searchAddress(),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: loc.t('searchAddressHint'),
-                      suffixIcon: IconButton(
-                        tooltip: loc.t('search'),
-                        onPressed: _isSearching ? null : _searchAddress,
-                        icon: _isSearching
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.arrow_forward),
-                      ),
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    hintText: loc.t('searchAddressHint'),
+                    isBottomInput: false,
+                    onSelected: (_) => _searchAddress(),
+                    onSubmitted: _searchAddress,
                   ),
                 ),
               ],
