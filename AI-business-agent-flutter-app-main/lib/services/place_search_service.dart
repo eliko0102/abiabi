@@ -31,6 +31,8 @@ class PlaceSearchService {
   Future<PlaceSearchResult> search(
     String query, {
     String city = '',
+    String countryCode = '',
+    Set<String>? types,
     String language = 'az',
   }) async {
     final normalizedQuery = query.trim();
@@ -41,6 +43,8 @@ class PlaceSearchService {
     final fromBackend = await _searchBackend(
       normalizedQuery,
       city: city,
+      countryCode: countryCode,
+      types: types,
       language: language,
     );
     if (fromBackend != null && fromBackend.isNotEmpty) {
@@ -50,6 +54,8 @@ class PlaceSearchService {
     final fromOsm = await _searchNominatim(
       normalizedQuery,
       city: city,
+      countryCode: countryCode,
+      types: types,
       language: language,
     );
     if (fromOsm == null) {
@@ -64,6 +70,8 @@ class PlaceSearchService {
   Future<List<Map<String, dynamic>>?> _searchBackend(
     String query, {
     required String city,
+    required String countryCode,
+    required Set<String>? types,
     required String language,
   }) async {
     try {
@@ -71,6 +79,8 @@ class PlaceSearchService {
         queryParameters: {
           'q': query,
           if (city.trim().isNotEmpty) 'city': city.trim(),
+          if (countryCode.trim().isNotEmpty) 'countryCode': countryCode.trim(),
+          if (types != null && types.isNotEmpty) 'types': types.join(','),
           'lang': language,
           'limit': '12',
         },
@@ -96,6 +106,8 @@ class PlaceSearchService {
   Future<List<Map<String, dynamic>>?> _searchNominatim(
     String query, {
     required String city,
+    required String countryCode,
+    required Set<String>? types,
     required String language,
   }) async {
     final scopedCity = city.trim();
@@ -110,6 +122,8 @@ class PlaceSearchService {
         'format': 'jsonv2',
         'addressdetails': '1',
         'limit': '7',
+        if (countryCode.trim().isNotEmpty)
+          'countrycodes': countryCode.trim().toLowerCase(),
         'accept-language': switch (language) {
           'en' => 'en,ru,az',
           'ru' => 'ru,az,en',

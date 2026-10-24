@@ -291,7 +291,7 @@ router.post('/chat', async (req, res) => {
 
 router.get('/suggest', async (req, res) => {
   try {
-    const { q, city, lang, limit } = req.query;
+    const { q, city, countryCode, types, lang, limit } = req.query;
     if (!q || String(q).trim().length < 2) {
       return res.status(400).json({
         success: false,
@@ -301,8 +301,10 @@ router.get('/suggest', async (req, res) => {
     const suggestions = await searchPlaces({
       q: String(q),
       city: city ? String(city) : '',
+      countryCode: countryCode ? String(countryCode) : '',
+      types: types ? String(types).split(',') : [],
       language: lang ? String(lang) : 'az',
-      limit: limit ? Number(limit) : 8,
+      limit: limit ? Number(limit) : 12,
     });
     res.status(200).json({ success: true, suggestions });
   } catch (error) {

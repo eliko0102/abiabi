@@ -70,10 +70,11 @@ Backend əlçatmazdırsa `PlaceSearchService` **birbaşa Nominatim-ə** düşür
 Nominatim biznes kataloqu deyil, ona görə biznes adları üçün əlavə iki pillə var:
 
 1. **2GIS Catalog API** — düzgün `TWOGIS_API_KEY` ilə biznes kartı, reytinq, qrafik və rəylər gəlir. Bu, əsas mənbədir.
-2. **Latin → kiril variantları** — Qazaxıstanda obyektlər çox vaxt rus/qazax kirilində qeydiyyatdadır: `Olzhay` və `Olzhai` yazılışları `олжай` və `олжа` variantları ilə, `Olzha` isə `олжа` ilə axtarılır. Kateqoriya sözləri çıxarılan brend variantı da yoxlanılır.
-3. **Qismən nəticələri tamamla** — Aktau şəhəri məlumdursa, backend Nominatim üçün `countrycodes=kz` göndərir və qismən uyğunluq tapılsa belə kiril variantlarını 2GIS-də yoxlayır. `/3.0/suggests` və `/3.0/items` nəticələri birləşdirilir ki, bir endpoint-in qismən nəticəsi digər endpoint-dəki biznesi gizlətməsin.
+2. **Axtarış ərazisini seç** — GPS icazəsi varsa cari şəhər/ölkə başlanğıc scope kimi təklif edilir; icazə yoxdursa axtarış `Bütün dünya` rejimində qalır. Xəritədə “Axtarış ərazisi” seçicisindən istənilən ölkə və şəhər seçilə və ya Worldwide rejiminə qayıtmaq olar. Seçilən ISO country code 2GIS/Nominatim sorğularına ötürülür. Region picker yalnız şəhər/ölkə nəticələrini göstərir və cari GPS ölkəsindən asılı deyil.
+3. **Ümumi brend axtarışı** — İstənilən region və dil üçün brend sorğularında uyğun mağaza/biznes kateqoriyaları da sorğulanır. Dəstəklənən kiril regionlarında latın yazılışı kiril variantları ilə yoxlanılır. Nəticələr ad/açıqlamada brend token-lərindən ən azı biri uyğun gələndə saxlanılır.
+4. **Ayrı obyektləri saxla** — Eyni 2GIS ID-si və ya eyni ad/yaxın koordinatlı nəticə birləşdirilir; yaxın məsafədə yerləşən, fərqli ID-li bizneslər ayrı təklif olaraq qalır.
 
-Uyğun biznes 2GIS kataloqunda olduqda `Olzhay` + `city=Aktau` axtarışı **ОЛЖАЙ** kimi kiril qeydiyyatlı nəticəni təklif edə bilər. Bu fallback ad yazılışını genişləndirir; dəqiq biznes məlumatı üçün Render-də ayrıca Catalog API açarı olan `TWOGIS_API_KEY` lazımdır.
+2GIS nəticə sayı seçilən ərazi, axtarış termini və Catalog API cavabından asılıdır. Tətbiq uyğun nəticələri 12-yə qədər göstərir, amma kataloqda olmayan obyekt uydurmur.
 
 > Qeyd: `lib/config/api_config.dart`-dakı açarlı tile URL-i **Catalog API açarı deyil** — catalog sorğuları `403 incorrect key` qaytarır. Render-də `TWOGIS_API_KEY` ayrıca Catalog API açarı ilə verilməlidir.
 

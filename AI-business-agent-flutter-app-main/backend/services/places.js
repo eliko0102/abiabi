@@ -188,7 +188,7 @@ const CATEGORY_WORDS = new Set([
   'центр',
 ]);
 
-/** "Olzha fitness club" → "Olzha" (drop generic category words). */
+/** "Olzha fitness club" -> "Olzha" by removing generic category words. */
 export function brandOnly(query = '') {
   const words = String(query).split(/\s+/).filter(Boolean);
   const kept = words.filter((word) => !CATEGORY_WORDS.has(normalize(word)));
@@ -557,8 +557,11 @@ function dedupe(results) {
     if (!candidate) continue;
     const duplicate = kept.some((existing) => {
       const distance = distanceMeters(existing.point, candidate.point);
+      if (existing.id && candidate.id && existing.id === candidate.id) {
+        return true;
+      }
       if (normalize(existing.name) === normalize(candidate.name)) {
-        return distance < 20000;
+        return distance < 50;
       }
       // The same city arrives from the gazetteer ("Almaty") and OSM
       // ("Almatı"); keep the first, drop the near-identical duplicate.
@@ -566,11 +569,7 @@ function dedupe(results) {
       if (broad.includes(existing.type) && broad.includes(candidate.type)) {
         return distance < 25000;
       }
-      return (
-        existing.type === candidate.type &&
-        distance < 150 &&
-        normalize(existing.name).slice(0, 4) === normalize(candidate.name).slice(0, 4)
-      );
+      return false;
     });
     if (!duplicate) kept.push(candidate);
   }
@@ -644,7 +643,7 @@ function cacheSet(key, value) {
   cache.set(key, { at: Date.now(), value });
 }
 
-async function twoGisSuggest(query, city, key) {
+async function twoGisSuggest(query, city, key, { itemsOnly = false } = {}) {
   if (!key) return [];
   const scoped = city && !normalize(query).includes(normalize(city)) ? `${city}, ${query}` : query;
   const fields = 'items.point,items.full_name,items.address_name,items.name,items.adm_div';
@@ -652,7 +651,8 @@ async function twoGisSuggest(query, city, key) {
     { path: '/3.0/suggests', params: { q: scoped, page_size: 10, fields } },
     { path: '/3.0/items', params: { q: scoped, page_size: 10, fields } },
   ];
-  const batches = await Promise.all(calls.map(async (call) => {
+  const selectedCalls = itemsOnly ? calls.slice(1) : calls;
+  const batches = await Promise.all(selectedCalls.map(async (call) => {
     try {
       const response = await axios.get(`${CATALOG_URL}${call.path}`, {
         params: { ...call.params, key },
@@ -732,41 +732,69 @@ async function nominatimSearch(query, { city = '', countryCode = '', limit = 8, 
  * Search countries, cities, addresses and businesses.
  * Returns normalised results ordered by usefulness for the map UI.
  */
-export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } = {}) {
+export async function searchPlaces({
+  q,
+  city = '',
+  countryCode: requestedCountryCode = '',
+  types = [],
+  language = 'az',
+  limit = 12,
+} = {}) {
   const query = String(q || '').trim();
   if (query.length < 2) return [];
   const languageCode = ['az', 'en', 'ru', 'kk'].includes(language) ? language : 'az';
   const normalizedQuery = normalize(query);
   const countryHit = findCountry(normalizedQuery);
-  const cityHit = findCities(normalize(city))[0] || findCities(normalizedQuery)[0];
-  const country = countryHit?.country || cityHit?.country;
+  const requestedTypes = new Set(
+    (Array.isArray(types) ? types : String(types || '').split(','))
+      .map((type) => String(type).trim())
+      .filter((type) => ['country', 'city', 'address', 'poi'].includes(type)),
+  );
+  const areaOnlySearch =
+    requestedTypes.size > 0 &&
+    [...requestedTypes].every((type) => type === 'city' || type === 'country');
+  const queryCityHit = findCities(normalizedQuery)[0];
+  const selectedCityHit = findCities(normalize(city))[0];
+  const country =
+    countryHit?.country ||
+    queryCityHit?.country ||
+    (areaOnlySearch ? null : selectedCityHit?.country);
+  const countryCode = String(
+    countryHit?.country?.code ||
+      queryCityHit?.country?.code ||
+      (areaOnlySearch ? '' : requestedCountryCode) ||
+      (areaOnlySearch ? '' : selectedCityHit?.country?.code) ||
+      '',
+  ).trim().toUpperCase();
+  const resultLimit = Math.max(1, Math.min(Number(limit) || 12, 12));
   const key = process.env.TWOGIS_API_KEY;
-  const cacheKey = `search:${normalizedQuery}|${normalize(city)}|${languageCode}`;
+  const cacheKey = `search:${normalizedQuery}|${normalize(city)}|${countryCode}|${[...requestedTypes].sort().join(',')}|${languageCode}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
   const staticResults = searchGazetteer(query, countryHit, languageCode);
-  const countryCode = country?.code || '';
-  // Only scope by the user's city when the query is not already country or
-  // city level; otherwise "Aktau, Qazaxıstan" hijacks country searches.
-  const cityScope = staticResults.length > 0 ? '' : city;
+  // Country and city names are already explicit in the query; don't narrow
+  // those lookups by the previously selected search area.
+  const cityScope =
+    staticResults.length > 0 || areaOnlySearch
+      ? ''
+      : String(city || '').trim();
 
-  // Country and exact-city queries are fully answered by the gazetteer and
-  // 2GIS. Nominatim is only a fallback for free-text addresses/POIs, which
-  // keeps it within its usage policy and avoids duplicate city rows.
   const skipOsm = Boolean(countryHit) || isExactCityQuery(normalizedQuery);
   const hasStatic = staticResults.length >= 2;
 
   const collect = async (
     variant,
-    { osmOnly = false, skipOsmFallback = false } = {},
+    { osmOnly = false, skipOsmFallback = false, itemsOnly = false } = {},
   ) => {
-    const gisResults = osmOnly ? [] : await twoGisSuggest(variant, cityScope, key);
+    const gisResults = osmOnly || requestedTypes.size > 0
+      ? []
+      : await twoGisSuggest(variant, cityScope, key, { itemsOnly });
     if (
       skipOsmFallback ||
       skipOsm ||
       hasStatic ||
-      (!osmOnly && gisResults.length >= 3)
+      (!osmOnly && requestedTypes.size === 0 && gisResults.length >= 3)
     ) {
       return gisResults;
     }
@@ -780,54 +808,73 @@ export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } 
   };
 
   let merged = dedupe([...staticResults, ...(await collect(query))]);
-
   const brand = brandOnly(query);
-  if (countryCode === 'KZ' && !skipOsm && /[a-z]/i.test(query)) {
-    // Search common Kazakhstan Cyrillic spellings even when a partial Latin
-    // match exists; 2GIS records local businesses under Russian/Kazakh names.
-    const variants = [
-      ...transliterationVariants(query),
-      ...(brand ? transliterationVariants(brand) : []),
-    ];
-    const variantResults = await Promise.all(
-      [...new Set(variants)]
-        .filter((variant) => normalize(variant) !== normalizedQuery)
-        .map((variant) => collect(variant, { skipOsmFallback: true })),
-    );
-    merged = dedupe([...variantResults.flat(), ...merged]);
-    const matchTerms = [...new Set([
-      ...variants,
-      query,
-      ...(brand ? [brand] : []),
-    ].map(normalize).filter(Boolean))];
-    const related = merged.filter((item) => {
-      const searchable = normalize(`${item.name} ${item.subtitle}`);
-      return matchTerms.some((term) => searchable.includes(term));
-    });
-    if (related.length > 0) merged = related;
-  } else {
-    // Keep the original fallback for searches outside Kazakhstan.
-    if (merged.length === 0 && !skipOsm && /[a-z]/i.test(query)) {
-      const cyrillic = transliterateToCyrillic(query);
-      if (cyrillic !== normalizedQuery && /[а-я]/.test(cyrillic)) {
-        merged = dedupe([...merged, ...(await collect(cyrillic, { osmOnly: true }))]);
-      }
-    }
-    if (merged.length === 0 && !skipOsm && brand) {
-      merged = dedupe([...merged, ...(await collect(brand, { osmOnly: true }))]);
-      if (merged.length === 0) {
-        const brandCyrillic = transliterateToCyrillic(brand);
-        if (/[а-я]/.test(brandCyrillic)) {
-          merged = dedupe([
-            ...merged,
-            ...(await collect(brandCyrillic, { osmOnly: true })),
-          ]);
-        }
-      }
-    }
+  const categoryRoot = brand || query;
+  const normalizedRoot = normalize(categoryRoot);
+  const meaningfulQueryTokens = normalize(query)
+    .split(' ')
+    .filter((token) => token.length >= 3 && !CATEGORY_WORDS.has(token));
+  const categoryTerms = countryCode === 'KZ'
+    ? ['магазин', 'market', 'рынок']
+    : countryCode === 'AZ'
+      ? ['mağaza', 'market', 'магазин']
+      : languageCode === 'ru'
+        ? ['магазин', 'рынок', 'business']
+        : languageCode === 'kk'
+          ? ['дүкен', 'маркет', 'business']
+          : languageCode === 'az'
+            ? ['mağaza', 'market', 'business']
+            : ['shop', 'store', 'business'];
+  const isBrandQuery =
+    meaningfulQueryTokens.length > 0 &&
+    !isExactCityQuery(normalizedQuery) &&
+    requestedTypes.size === 0 &&
+    !countryHit;
+  const variants =
+    /[a-z]/i.test(query) &&
+    (!countryCode || ['KZ', 'AZ', 'RU', 'KG', 'UZ', 'GE', 'AM', 'BY', 'TJ', 'TM'].includes(countryCode))
+      ? [
+          ...transliterationVariants(query),
+          ...(brand ? transliterationVariants(brand) : []),
+        ]
+      : [];
+  const variantQueries = [...new Set(variants)].filter(
+    (variant) => normalize(variant) !== normalizedQuery,
+  );
+  const categoryQueries = isBrandQuery && !normalizedRoot.includes(' ')
+    ? categoryTerms.map((term) => `${categoryRoot} ${term}`)
+    : [];
+  const extraResults = await Promise.all([
+    ...variantQueries.map((variant) =>
+      collect(variant, { skipOsmFallback: true }),
+    ),
+    ...categoryQueries.map((variant) =>
+      collect(variant, { skipOsmFallback: true, itemsOnly: true }),
+    ),
+  ]);
+  if (extraResults.length > 0) {
+    merged = dedupe([...extraResults.flat(), ...merged]);
   }
 
-  const results = merged.slice(0, Math.max(1, Math.min(Number(limit) || 8, 12)));
+  if (isBrandQuery && merged.length > 0) {
+    const relatedTerms = [...new Set([
+      normalizedRoot,
+      ...normalizedRoot
+        .split(' ')
+        .filter((term) => term.length >= 3 && !CATEGORY_WORDS.has(term)),
+      ...variants.map(normalize),
+    ].filter(Boolean))];
+    const related = merged.filter((item) => {
+      const searchable = normalize(`${item.name} ${item.subtitle}`);
+      return relatedTerms.some((term) => searchable.includes(term));
+    });
+    merged = related;
+  }
+
+  const typedResults = requestedTypes.size > 0
+    ? merged.filter((item) => requestedTypes.has(item.type))
+    : merged;
+  const results = typedResults.slice(0, resultLimit);
   cacheSet(cacheKey, results);
   return results;
 }

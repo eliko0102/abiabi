@@ -29,8 +29,25 @@ typedef NewPointAnalyzeCallback =
       Map<String, dynamic>? point,
     });
 
-Future<String?> detectUserLocationCity() async {
-  String? detectedCity;
+class DetectedSearchRegion {
+  const DetectedSearchRegion({
+    required this.city,
+    required this.country,
+    required this.countryCode,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String city;
+  final String country;
+  final String countryCode;
+  final double latitude;
+  final double longitude;
+
+  String get label => [city, country].where((part) => part.isNotEmpty).join(', ');
+}
+
+Future<DetectedSearchRegion?> detectUserSearchRegion() async {
   try {
     // Let Android/iOS show its native choices, including "Only this time".
     var permission = await Geolocator.checkPermission();
@@ -57,17 +74,33 @@ Future<String?> detectUserLocationCity() async {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final address = data['address'] as Map<String, dynamic>? ?? {};
-        final city =
-            address['city'] ?? address['town'] ?? address['municipality'];
-        if (city != null && city.toString().trim().isNotEmpty) {
-          detectedCity = city.toString().trim();
+        final city = (address['city'] ??
+                address['town'] ??
+                address['municipality'] ??
+                address['village'] ??
+                '')
+            .toString()
+            .trim();
+        final country = (address['country'] ?? '').toString().trim();
+        final countryCode = (address['country_code'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+        if (city.isNotEmpty || country.isNotEmpty) {
+          return DetectedSearchRegion(
+            city: city,
+            country: country,
+            countryCode: countryCode,
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
         }
       }
     }
   } catch (_) {
     // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
   }
-  return detectedCity;
+  return null;
 }
 
 const businessCategoryIds = <String>[
@@ -467,12 +500,14 @@ class OldPointSurveyScreen extends StatefulWidget {
     required this.onAudit,
     required this.localeCode,
     this.city = '',
+    this.countryCode = '',
   });
 
   final VoidCallback onBack;
   final AuditCallback onAudit;
   final String localeCode;
   final String city;
+  final String countryCode;
 
   @override
   State<OldPointSurveyScreen> createState() => _OldPointSurveyScreenState();
@@ -733,6 +768,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
                 hintText: t('addressHint'),
                 isBottomInput: true,
                 city: widget.city,
+                countryCode: widget.countryCode,
                 language: widget.localeCode,
                 onSelected: (place) => setState(() => _selectedPlace = place),
               ),
@@ -1633,12 +1669,14 @@ class NewPointAssistantScreen extends StatefulWidget {
     required this.onAnalyze,
     required this.localeCode,
     this.initialCity = '',
+    this.initialCountryCode = '',
   });
   final VoidCallback onBack;
   final VoidCallback onMap;
   final NewPointAnalyzeCallback onAnalyze;
   final String localeCode;
   final String initialCity;
+  final String initialCountryCode;
 
   @override
   State<NewPointAssistantScreen> createState() =>
@@ -1655,6 +1693,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
   String? _address;
   bool _loading = false;
   String _city = '';
+  String _countryCode = '';
   Map<String, dynamic>? _selectedPlace;
   Map<String, dynamic>? _analysisContext;
 
@@ -1671,6 +1710,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
       ),
     ];
     _city = widget.initialCity;
+    _countryCode = widget.initialCountryCode;
   }
 
   @override
@@ -1942,6 +1982,7 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                     hintText: _t('chatHint'),
                     isBottomInput: true,
                     city: _city,
+                    countryCode: _countryCode,
                     language: widget.localeCode,
                     onSelected: (place) {
                       _selectedPlace = place;

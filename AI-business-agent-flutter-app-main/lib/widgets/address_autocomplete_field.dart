@@ -58,6 +58,8 @@ class AddressAutocompleteField extends StatefulWidget {
     required this.onSelected,
     this.isBottomInput = false,
     this.city = '',
+    this.countryCode = '',
+    this.allowedTypes,
     this.onSubmitted,
     this.language,
   });
@@ -70,6 +72,8 @@ class AddressAutocompleteField extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>> onSelected;
   final bool isBottomInput;
   final String city;
+  final String countryCode;
+  final Set<String>? allowedTypes;
   final VoidCallback? onSubmitted;
   final String? language;
 
@@ -122,11 +126,17 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     final result = await _searchService.search(
       query,
       city: widget.city,
+      countryCode: widget.countryCode,
+      types: widget.allowedTypes,
       language: _language,
     );
     if (!mounted || requestId != _requestId) return;
     setState(() {
-      _suggestions = result.items;
+      _suggestions = widget.allowedTypes == null
+          ? result.items
+          : result.items
+            .where((item) => widget.allowedTypes!.contains(item['type']))
+            .toList();
       _isLoading = false;
       // An empty list after a failed request is an error, not "no results";
       // the two states must look different to the user.

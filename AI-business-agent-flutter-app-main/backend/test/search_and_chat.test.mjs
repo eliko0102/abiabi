@@ -33,13 +33,21 @@ test('Latin business names fall back to their Cyrillic registration', () => {
   assert.equal(brandOnly('fitness club'), '');
 });
 
-test('Aktau business search includes Kazakh Cyrillic spelling suggestions', async () => {
+test('Aktau business search includes relevant Olzha suggestions', async () => {
   const previousKey = process.env.TWOGIS_API_KEY;
   const previousAdapter = axios.defaults.adapter;
   const requestedQueries = [];
   process.env.TWOGIS_API_KEY = 'test-key';
   axios.defaults.adapter = async (config) => {
     const query = String(config.params?.q || '');
+    const onItems = config.url.endsWith('/3.0/items');
+    const byId = (id, name, lat) => ({
+      id,
+      name,
+      address_name: `${id}, Aktau`,
+      point: { lat, lon: 51.16 },
+      adm_div: [{ type: 'city', name: 'Aktau' }],
+    });
     requestedQueries.push({
       url: config.url,
       query,
@@ -47,24 +55,26 @@ test('Aktau business search includes Kazakh Cyrillic spelling suggestions', asyn
       countrycodes: config.params?.countrycodes,
       acceptLanguage: config.params?.['accept-language'],
     });
-    const isSuggestEndpoint = config.url.endsWith('/3.0/suggests');
-    const isItemsEndpoint = config.url.endsWith('/3.0/items');
-    const items = query.toLowerCase().includes('olzhay') && isSuggestEndpoint
-      ? [{
-          id: 'unrelated-prefix',
-          name: 'Alligator Aktau',
-          point: { lat: 43.651, lon: 51.161 },
-          adm_div: [{ type: 'city', name: 'Aktau' }],
-        }]
-      : query.includes('олжай') && isItemsEndpoint
-        ? [{
-          id: 'olzhai-aktau',
-          name: 'ОЛЖАЙ',
-          address_name: '30 микрорайон, Aktau',
-          point: { lat: 43.65, lon: 51.16 },
-          adm_div: [{ type: 'city', name: 'Aktau' }],
-        }]
-        : [];
+    let items = [];
+    if (query.includes('Olzha') && !onItems) {
+      items = [byId('unrelated-prefix', 'Alligator Aktau', 43.651)];
+    } else if (query.includes('Olzha market') && onItems) {
+      items = [byId('olzha-market', 'Олжа, супермаркет', 43.652)];
+    } else if (query.includes('Olzha магазин') && onItems) {
+      items = [byId('olzha-fitness', 'Fitness Olzha Club', 43.653)];
+    } else if (query.includes('Olzha рынок') && onItems) {
+      items = [byId('olzha-build', 'Олжа строй, строительный рынок', 43.654)];
+    } else if (query.includes('Olzha') && onItems) {
+      items = [
+        byId('olzha-komplex', 'Олжа, универсально-торговый комплекс', 43.655),
+        byId('olzha-tc', 'ТЦ Олжа', 43.656),
+        byId('olzha-bar', 'Олжа, бар', 43.657),
+        byId('olzha-ceh', 'Олжа, цех натяжных потолков', 43.658),
+        byId('olzha-mini', 'Олжа, мини-маркет', 43.659),
+      ];
+    } else if (query.includes('олжа') && onItems) {
+      items = [byId('olzha-cyrillic', 'ОЛЖА', 43.66)];
+    }
     return {
       data: { meta: { code: 200 }, result: { items } },
       status: 200,
@@ -75,14 +85,61 @@ test('Aktau business search includes Kazakh Cyrillic spelling suggestions', asyn
   };
 
   try {
-    const results = await searchPlaces({ q: 'Olzhay', city: 'Aktau', language: 'kk' });
-    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, олжай'));
-    assert.ok(requestedQueries.some(({ url, query }) => url.endsWith('/3.0/items') && query === 'Aktau, олжай'));
+    const results = await searchPlaces({ q: 'Olzha', city: 'Aktau', countryCode: 'KZ', language: 'kk' });
+    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, олжа'));
+    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, Olzha market'));
+    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, Olzha магазин'));
+    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, Olzha рынок'));
     assert.ok(requestedQueries.some(({ pageSize }) => pageSize === 10));
-    assert.ok(requestedQueries.some(({ countrycodes }) => countrycodes === 'kz'));
-    assert.ok(requestedQueries.some(({ acceptLanguage }) => acceptLanguage === 'kk,ru,en'));
+    assert.ok(requestedQueries.every(({ query }) => query.startsWith('Aktau, ')));
     assert.ok(!results.some(({ name }) => name === 'Alligator Aktau'));
-    assert.ok(results.some(({ name, city }) => name === 'ОЛЖАЙ' && city === 'Aktau'));
+    assert.ok(results.length >= 8);
+    assert.equal(new Set(results.map((item) => item.id)).size, results.length);
+    assert.ok(results.every(({ name }) => /olzh|олжа/i.test(name)));
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
+test('search region can be selected independently or left worldwide', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const requestedQueries = [];
+  process.env.TWOGIS_API_KEY = 'test-key';
+  axios.defaults.adapter = async (config) => {
+    requestedQueries.push({
+      query: String(config.params?.q || ''),
+      countrycodes: config.params?.countrycodes,
+    });
+    return {
+      data: { meta: { code: 200 }, result: { items: [] } },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    await searchPlaces({
+      q: 'Northstar',
+      city: 'Baku',
+      countryCode: 'AZ',
+      language: 'az',
+    });
+    const selectedRegionQueries = [...requestedQueries];
+    assert.ok(selectedRegionQueries.some(({ query }) => query === 'Baku, Northstar'));
+    assert.ok(selectedRegionQueries.some(({ query }) => query === 'Baku, Northstar mağaza'));
+    assert.ok(selectedRegionQueries.every(({ countrycodes }) => countrycodes !== 'kz'));
+
+    requestedQueries.length = 0;
+    await searchPlaces({ q: 'Northstar', language: 'en' });
+    assert.ok(requestedQueries.some(({ query }) => query === 'Northstar'));
+    assert.ok(requestedQueries.some(({ query }) => query === 'Northstar shop'));
+    assert.ok(requestedQueries.every(({ query }) => !query.startsWith('Baku, ')));
+    assert.ok(requestedQueries.every(({ countrycodes }) => !countrycodes));
   } finally {
     axios.defaults.adapter = previousAdapter;
     if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
@@ -133,6 +190,18 @@ test('a country plus a city narrows the city list', async () => {
   } finally {
     if (previousKey) process.env.TWOGIS_API_KEY = previousKey;
   }
+});
+
+test('an explicit city query overrides the selected search region', async () => {
+  const results = await searchPlaces({
+    q: 'Aktau',
+    city: 'Baku',
+    countryCode: 'AZ',
+    language: 'az',
+  });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].name, 'Aktau');
+  assert.equal(results[0].country_code, 'KZ');
 });
 
 test('compactAnalysis keeps the chat context small and factual', () => {
@@ -225,6 +294,138 @@ test('GET /api/suggest validates the query and returns typed results', async () 
     assert.equal(body.suggestions[0].type, 'country');
     assert.ok(body.suggestions[0].bbox);
   });
+});
+
+test('GET /api/suggest applies a user-selected country code', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const requests = [];
+  delete process.env.TWOGIS_API_KEY;
+  axios.defaults.adapter = async (config) => {
+    requests.push(config);
+    return {
+      data: [],
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    await withServer(async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/suggest?q=Redwood&city=Baku&countryCode=AZ&lang=az`,
+      );
+      assert.equal(response.status, 200);
+      assert.ok(requests.some(({ params }) => params?.countrycodes === 'az'));
+    });
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
+test('GET /api/suggest can return only city and country choices', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const requestedUrls = [];
+  process.env.TWOGIS_API_KEY = 'test-key';
+  axios.defaults.adapter = async (config) => {
+    requestedUrls.push(config.url);
+    return {
+      data: [{
+        place_id: 123,
+        osm_type: 'relation',
+        osm_id: 123,
+        lat: '48.8566',
+        lon: '2.3522',
+        name: 'Paris',
+        type: 'city',
+        addresstype: 'city',
+        address: { city: 'Paris', country: 'France', country_code: 'fr' },
+        boundingbox: ['48.8', '48.9', '2.2', '2.4'],
+      }],
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    await withServer(async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/suggest?q=Paris&types=city,country&lang=en`,
+      );
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.deepEqual(body.suggestions.map((item) => item.type), ['city']);
+      assert.equal(body.suggestions[0].country_code, 'FR');
+      assert.ok(requestedUrls.includes('https://nominatim.openstreetmap.org/search'));
+    });
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
+test('location picker searches outside the current GPS country', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const nominatimRequests = [];
+  process.env.TWOGIS_API_KEY = 'test-key';
+  axios.defaults.adapter = async (config) => {
+    if (config.url === 'https://nominatim.openstreetmap.org/search') {
+      nominatimRequests.push(config);
+      return {
+        data: [{
+          place_id: 456,
+          osm_type: 'relation',
+          osm_id: 456,
+          lat: '48.8566',
+          lon: '2.3522',
+          name: 'Paris',
+          type: 'city',
+          addresstype: 'city',
+          address: { city: 'Paris', country: 'France', country_code: 'fr' },
+          boundingbox: ['48.8', '48.9', '2.2', '2.4'],
+        }],
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      };
+    }
+    return {
+      data: { meta: { code: 200 }, result: { items: [] } },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    const results = await searchPlaces({
+      q: 'Paris',
+      city: 'Baku',
+      countryCode: 'AZ',
+      types: ['city', 'country'],
+      language: 'en',
+    });
+    assert.equal(results[0].name, 'Paris');
+    assert.equal(results[0].country_code, 'FR');
+    assert.ok(nominatimRequests.length > 0);
+    assert.ok(nominatimRequests.every(({ params }) => !params.countrycodes));
+    assert.ok(nominatimRequests.every(({ params }) => params.q === 'Paris'));
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
 });
 
 test('POST /api/chat validates missing prompt and missing provider key', async () => {

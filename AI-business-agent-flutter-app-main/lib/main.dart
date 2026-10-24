@@ -252,6 +252,10 @@ class AppLocalizations extends InheritedWidget {
       'planThreeSubtitle': 'Yanaşı müqayisə ilə tam analiz',
       'continue': 'Davam et',
       'searchAddressHint': 'Şəhər və ya ünvan axtar...',
+      'searchRegion': 'Axtarış ərazisi',
+      'searchRegionHint': 'İstənilən şəhər və ya ölkə...',
+      'worldwide': 'Bütün dünya',
+      'useCurrentLocation': 'Cari məkanım',
       'search': 'Axtar',
       'addressNotFound': 'Ünvan tapılmadı. Daha dəqiq yazın.',
       'locationIndex': 'Məkan indeksi',
@@ -481,6 +485,10 @@ class AppLocalizations extends InheritedWidget {
       'planThreeSubtitle': 'Full analysis with side-by-side comparison',
       'continue': 'Continue',
       'searchAddressHint': 'Search city or address...',
+      'searchRegion': 'Search area',
+      'searchRegionHint': 'Any city or country...',
+      'worldwide': 'Worldwide',
+      'useCurrentLocation': 'Current location',
       'search': 'Search',
       'addressNotFound': 'Address not found. Please be more specific.',
       'locationIndex': 'Location index',
@@ -714,6 +722,10 @@ class AppLocalizations extends InheritedWidget {
       'planThreeSubtitle': 'Полный анализ со сравнением рядом',
       'continue': 'Продолжить',
       'searchAddressHint': 'Поиск города или адреса...',
+      'searchRegion': 'Область поиска',
+      'searchRegionHint': 'Любой город или страна...',
+      'worldwide': 'Весь мир',
+      'useCurrentLocation': 'Текущее местоположение',
       'search': 'Поиск',
       'addressNotFound': 'Адрес не найден. Уточните запрос.',
       'locationIndex': 'Индекс места',
@@ -944,6 +956,10 @@ class AppLocalizations extends InheritedWidget {
       'planThreeSubtitle': 'Қатар салыстырумен толық талдау',
       'continue': 'Жалғастыру',
       'searchAddressHint': 'Қала немесе мекенжай іздеу...',
+      'searchRegion': 'Іздеу аймағы',
+      'searchRegionHint': 'Кез келген қала немесе ел...',
+      'worldwide': 'Бүкіл әлем',
+      'useCurrentLocation': 'Ағымдағы орын',
       'search': 'Іздеу',
       'addressNotFound': 'Мекенжай табылмады. Нақтырақ жазыңыз.',
       'locationIndex': 'Орын индексі',
@@ -1357,8 +1373,22 @@ class _HomeShellState extends State<HomeShell> {
   int? _activeFlow;
   String _auditAddress = '';
   String _confirmedCity = '';
+  String _confirmedCountry = '';
+  String _confirmedCountryCode = '';
+  DetectedSearchRegion? _deviceSearchRegion;
+  bool _searchRegionManuallySelected = false;
   bool _locationPromptShown = false;
   String? _auditUserId;
+
+  String get _searchScopeName =>
+      _confirmedCity.isNotEmpty ? _confirmedCity : _confirmedCountry;
+
+  String _searchScopeLabel(AppLocalizations loc) {
+    final parts = [_confirmedCity, _confirmedCountry]
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+    return parts.isEmpty ? loc.t('worldwide') : parts.join(', ');
+  }
 
   final List<String> _notifications = const [
     'Yeni sınaq bildirişi: hesabınız uğurla yaradıldı.',
@@ -1497,7 +1527,7 @@ class _HomeShellState extends State<HomeShell> {
     if (address.isEmpty) return;
     try {
       await _locationController.analyze(
-        city: _confirmedCity.isNotEmpty ? _confirmedCity : address,
+        city: _searchScopeName.isNotEmpty ? _searchScopeName : address,
         businessType: businessType,
         address: address,
       );
@@ -1557,6 +1587,9 @@ class _HomeShellState extends State<HomeShell> {
       _auditUserId = null;
       _auditHistory = [];
       _confirmedCity = '';
+      _confirmedCountry = '';
+      _confirmedCountryCode = '';
+      _searchRegionManuallySelected = false;
       _locationPromptShown = false;
     });
   }
@@ -1578,10 +1611,57 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _confirmInitialCity() async {
     if (_locationPromptShown || !mounted) return;
     _locationPromptShown = true;
-    final city = await detectUserLocationCity();
-    if (mounted && city != null && city.trim().isNotEmpty) {
-      setState(() => _confirmedCity = city.trim());
+    await _useCurrentLocationForSearch(markManualSelection: false);
+  }
+
+  Future<DetectedSearchRegion?> _useCurrentLocationForSearch({
+    bool markManualSelection = true,
+  }) async {
+    final region = await detectUserSearchRegion();
+    if (!mounted || region == null) return null;
+    _deviceSearchRegion = region;
+    if (!_searchRegionManuallySelected || markManualSelection) {
+      setState(() {
+        _confirmedCity = region.city;
+        _confirmedCountry = region.country;
+        _confirmedCountryCode = region.countryCode;
+        if (markManualSelection) _searchRegionManuallySelected = true;
+      });
     }
+    return region;
+  }
+
+  void _updateSearchRegion(Map<String, dynamic> place) {
+    final type = place['type']?.toString() ?? '';
+    if (type == 'worldwide') {
+      setState(() {
+        _confirmedCity = '';
+        _confirmedCountry = '';
+        _confirmedCountryCode = '';
+        _deviceSearchRegion = null;
+        _searchRegionManuallySelected = true;
+      });
+      return;
+    }
+
+    final name = (place['name'] ?? '').toString().trim();
+    final city = type == 'country'
+        ? ''
+        : (place['city']?.toString().trim().isNotEmpty == true
+              ? place['city'].toString().trim()
+              : name);
+    final country = type == 'country'
+        ? name
+        : (place['subtitle'] ?? '').toString().trim();
+    setState(() {
+      _confirmedCity = city;
+      _confirmedCountry = country;
+      _confirmedCountryCode = (place['country_code'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+      _searchRegionManuallySelected = true;
+    });
   }
 
   @override
@@ -1727,7 +1807,17 @@ class _HomeShellState extends State<HomeShell> {
                 ),
                 MapScreen(
                   controller: _locationController,
-                  city: _confirmedCity,
+                  city: _searchScopeName,
+                  countryCode: _confirmedCountryCode,
+                  currentLocation: _deviceSearchRegion == null
+                      ? null
+                      : LatLng(
+                          _deviceSearchRegion!.latitude,
+                          _deviceSearchRegion!.longitude,
+                        ),
+                  searchRegionLabel: _searchScopeLabel(loc),
+                  onSearchRegionChanged: _updateSearchRegion,
+                  onUseCurrentLocation: _useCurrentLocationForSearch,
                   onAskAi: _askAiAboutAnalysis,
                 ),
                 ChatScreen(controller: _locationController),
@@ -1750,14 +1840,16 @@ class _HomeShellState extends State<HomeShell> {
           if (_authenticated && _activeFlow == 1)
             OldPointSurveyScreen(
               localeCode: widget.currentLocaleCode,
-              city: _confirmedCity,
+              city: _searchScopeName,
+              countryCode: _confirmedCountryCode,
               onBack: () => setState(() => _activeFlow = null),
               onAudit: _runAudit,
             ),
           if (_authenticated && _activeFlow == 2)
             NewPointAssistantScreen(
               localeCode: widget.currentLocaleCode,
-              initialCity: _confirmedCity,
+              initialCity: _searchScopeName,
+              initialCountryCode: _confirmedCountryCode,
               onBack: () => setState(() => _activeFlow = null),
               onAnalyze: _runChatLocationAnalysis,
               onMap: () => setState(() {
@@ -3171,12 +3263,22 @@ class MapScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onAskAi,
+    required this.countryCode,
+    required this.searchRegionLabel,
+    required this.onSearchRegionChanged,
+    required this.onUseCurrentLocation,
+    this.currentLocation,
     this.city = '',
   });
 
   final LocationAnalysisController controller;
   final VoidCallback onAskAi;
   final String city;
+  final String countryCode;
+  final String searchRegionLabel;
+  final ValueChanged<Map<String, dynamic>> onSearchRegionChanged;
+  final Future<DetectedSearchRegion?> Function() onUseCurrentLocation;
+  final LatLng? currentLocation;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -3193,7 +3295,7 @@ class _MapScreenState extends State<MapScreen> {
     _CityPin(name: 'Aktau', point: const LatLng(43.6500, 51.1600)),
   ];
 
-  static const LatLng _kazakhstanCenter = LatLng(48.0196, 66.9237);
+  static const LatLng _worldCenter = LatLng(20, 0);
 
   _CityPin? _selected;
   _CityPin? _customPin;
@@ -3212,7 +3314,18 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
-    _locateDevice();
+  }
+
+  @override
+  void didUpdateWidget(covariant MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentLocation == null && widget.currentLocation != null) {
+      final point = widget.currentLocation!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(point, 14.5);
+      });
+    }
   }
 
   Future<void> _locateDevice({bool clearAnalysis = false}) async {
@@ -3429,6 +3542,101 @@ class _MapScreenState extends State<MapScreen> {
     _mapController.move(point, zoom.clamp(3, 18).toDouble());
   }
 
+  Future<void> _showSearchRegionPicker() async {
+    final loc = AppLocalizations.of(context);
+    final searchController = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        final screenSize = MediaQuery.sizeOf(sheetContext);
+        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SizedBox(
+            height: (screenSize.height * .72).clamp(340.0, 640.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Text(
+                    loc.t('searchRegion'),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            widget.onSearchRegionChanged({'type': 'worldwide'});
+                            Navigator.pop(sheetContext);
+                          },
+                          icon: const Icon(Icons.public),
+                          label: Text(loc.t('worldwide')),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final region = await widget.onUseCurrentLocation();
+                            if (region != null && mounted) {
+                              final pin = _CityPin(
+                                name: region.label,
+                                point: LatLng(region.latitude, region.longitude),
+                              );
+                              setState(() {
+                                _customPin = pin;
+                                _selected = pin;
+                                _selectedPlace = null;
+                              });
+                              try {
+                                _mapController.move(pin.point, 14.5);
+                              } catch (_) {
+                                _pendingAnalysisPoint = pin.point;
+                              }
+                            }
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          },
+                          icon: const Icon(Icons.my_location),
+                          label: Text(loc.t('useCurrentLocation')),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                    child: AddressAutocompleteField(
+                      controller: searchController,
+                      hintText: loc.t('searchRegionHint'),
+                      allowedTypes: const {'city', 'country'},
+                      language: loc.locale.languageCode,
+                      onSelected: (place) {
+                        widget.onSearchRegionChanged(place);
+                        _applyPlace(place);
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    searchController.dispose();
+  }
+
   Future<void> _analyzeSelected() async {
     final pin = _selected;
     if (pin == null) return;
@@ -3448,7 +3656,9 @@ class _MapScreenState extends State<MapScreen> {
     final analysis = widget.controller.analysis;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final point = _analysisPoint(analysis);
-    final markers = <Marker>[..._cityMarkers(scheme)];
+    final markers = <Marker>[
+      if (widget.countryCode == 'KZ') ..._cityMarkers(scheme),
+    ];
     if (_customPin != null)
       markers.add(_pinMarker(_customPin!, Colors.red, 46));
     if (point != null && _customPin == null) {
@@ -3470,8 +3680,8 @@ class _MapScreenState extends State<MapScreen> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: _kazakhstanCenter,
-              initialZoom: 4.6,
+              initialCenter: widget.currentLocation ?? _worldCenter,
+              initialZoom: widget.currentLocation == null ? 2.5 : 12.5,
               minZoom: 3,
               maxZoom: 19,
               onMapReady: _moveToPendingAnalysis,
@@ -3486,7 +3696,7 @@ class _MapScreenState extends State<MapScreen> {
                 maxZoom: 19,
               ),
               CircleLayer(
-                circles: _cities
+                circles: (widget.countryCode == 'KZ' ? _cities : const <_CityPin>[])
                     .map(
                       (city) => CircleMarker(
                         point: city.point,
@@ -3522,13 +3732,31 @@ class _MapScreenState extends State<MapScreen> {
                   elevation: 4,
                   borderRadius: BorderRadius.circular(25),
                   color: dark ? const Color(0xFF18181B) : Colors.white,
-                  child: AddressAutocompleteField(
-                    controller: _searchController,
-                    hintText: loc.t('searchAddressHint'),
-                    isBottomInput: false,
-                    city: widget.city,
-                    language: loc.locale.languageCode,
-                    onSelected: _applyPlace,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AddressAutocompleteField(
+                        controller: _searchController,
+                        hintText: loc.t('searchAddressHint'),
+                        isBottomInput: false,
+                        city: widget.city,
+                        countryCode: widget.countryCode,
+                        language: loc.locale.languageCode,
+                        onSelected: _applyPlace,
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _showSearchRegionPicker,
+                          icon: const Icon(Icons.public, size: 18),
+                          label: Text(
+                            '${loc.t('searchRegion')}: ${widget.searchRegionLabel}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -3593,29 +3821,30 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      SizedBox(
-                        height: 38,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _visibleCities.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final city = _visibleCities[index];
-                            final selected = _selected?.name == city.name;
-                            return ChoiceChip(
-                              label: Text(city.name),
-                              selected: selected,
-                              onSelected: (_) => _focusCity(city),
-                              selectedColor: scheme.primary,
-                              labelStyle: TextStyle(
-                                color: selected ? Colors.white : null,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            );
-                          },
+                      if (widget.countryCode == 'KZ')
+                        SizedBox(
+                          height: 38,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _visibleCities.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final city = _visibleCities[index];
+                              final selected = _selected?.name == city.name;
+                              return ChoiceChip(
+                                label: Text(city.name),
+                                selected: selected,
+                                onSelected: (_) => _focusCity(city),
+                                selectedColor: scheme.primary,
+                                labelStyle: TextStyle(
+                                  color: selected ? Colors.white : null,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
                       if (_selected != null || analysis != null) ...[
                         const SizedBox(height: 12),
                         Row(
