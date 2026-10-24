@@ -649,8 +649,8 @@ async function twoGisSuggest(query, city, key) {
   const scoped = city && !normalize(query).includes(normalize(city)) ? `${city}, ${query}` : query;
   const fields = 'items.point,items.full_name,items.address_name,items.name,items.adm_div';
   const calls = [
-    { path: '/3.0/suggests', params: { q: scoped, page_size: 8, fields } },
-    { path: '/3.0/items', params: { q: scoped, page_size: 8, fields } },
+    { path: '/3.0/suggests', params: { q: scoped, page_size: 10, fields } },
+    { path: '/3.0/items', params: { q: scoped, page_size: 10, fields } },
   ];
   const batches = await Promise.all(calls.map(async (call) => {
     try {
@@ -795,6 +795,16 @@ export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } 
         .map((variant) => collect(variant, { skipOsmFallback: true })),
     );
     merged = dedupe([...variantResults.flat(), ...merged]);
+    const matchTerms = [...new Set([
+      ...variants,
+      query,
+      ...(brand ? [brand] : []),
+    ].map(normalize).filter(Boolean))];
+    const related = merged.filter((item) => {
+      const searchable = normalize(`${item.name} ${item.subtitle}`);
+      return matchTerms.some((term) => searchable.includes(term));
+    });
+    if (related.length > 0) merged = related;
   } else {
     // Keep the original fallback for searches outside Kazakhstan.
     if (merged.length === 0 && !skipOsm && /[a-z]/i.test(query)) {

@@ -177,12 +177,17 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     if (!_hasSearched && _suggestions.isEmpty) return const SizedBox.shrink();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final availableHeight =
+      MediaQuery.sizeOf(context).height - MediaQuery.viewInsetsOf(context).bottom;
+    final suggestionsHeight = (availableHeight * 0.7)
+      .clamp(260.0, 480.0)
+      .toDouble();
     return Container(
       margin: EdgeInsets.only(
         bottom: widget.isBottomInput ? 8.0 : 0.0,
         top: widget.isBottomInput ? 0.0 : 8.0,
       ),
-      constraints: const BoxConstraints(maxHeight: 260),
+      constraints: BoxConstraints(maxHeight: suggestionsHeight),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E24) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -242,49 +247,52 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                   ],
                 ),
               )
-            : ListView.separated(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = _suggestions[index];
-                  final type = (item['type'] ?? 'poi').toString();
-                  final subtitle = (item['subtitle'] ?? item['city'] ?? '')
-                      .toString();
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(
-                      _iconFor(type),
-                      size: 18,
-                      color: const Color(0xFFA855F7),
-                    ),
-                    title: Text(
-                      item['name']?.toString() ?? '',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+            : Scrollbar(
+                thumbVisibility: true,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: _suggestions.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final item = _suggestions[index];
+                    final type = (item['type'] ?? 'poi').toString();
+                    final subtitle = (item['subtitle'] ?? item['city'] ?? '')
+                        .toString();
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        _iconFor(type),
+                        size: 18,
+                        color: const Color(0xFFA855F7),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      [
-                        _label(_language, type),
-                        if (subtitle.isNotEmpty) subtitle,
-                      ].join(' · '),
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: const Icon(
-                      Icons.north_west,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                    onTap: () => _selectItem(item),
-                  );
-                },
+                      title: Text(
+                        item['name']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        [
+                          _label(_language, type),
+                          if (subtitle.isNotEmpty) subtitle,
+                        ].join(' · '),
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: const Icon(
+                        Icons.north_west,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
+                      onTap: () => _selectItem(item),
+                    );
+                  },
+                ),
               ),
       ),
     );

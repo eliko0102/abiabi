@@ -43,6 +43,7 @@ test('Aktau business search includes Kazakh Cyrillic spelling suggestions', asyn
     requestedQueries.push({
       url: config.url,
       query,
+      pageSize: config.params?.page_size,
       countrycodes: config.params?.countrycodes,
       acceptLanguage: config.params?.['accept-language'],
     });
@@ -50,8 +51,8 @@ test('Aktau business search includes Kazakh Cyrillic spelling suggestions', asyn
     const isItemsEndpoint = config.url.endsWith('/3.0/items');
     const items = query.toLowerCase().includes('olzhay') && isSuggestEndpoint
       ? [{
-          id: 'olzhay-partial',
-          name: 'Olzhay nearby place',
+          id: 'unrelated-prefix',
+          name: 'Alligator Aktau',
           point: { lat: 43.651, lon: 51.161 },
           adm_div: [{ type: 'city', name: 'Aktau' }],
         }]
@@ -77,9 +78,10 @@ test('Aktau business search includes Kazakh Cyrillic spelling suggestions', asyn
     const results = await searchPlaces({ q: 'Olzhay', city: 'Aktau', language: 'kk' });
     assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, олжай'));
     assert.ok(requestedQueries.some(({ url, query }) => url.endsWith('/3.0/items') && query === 'Aktau, олжай'));
+    assert.ok(requestedQueries.some(({ pageSize }) => pageSize === 10));
     assert.ok(requestedQueries.some(({ countrycodes }) => countrycodes === 'kz'));
     assert.ok(requestedQueries.some(({ acceptLanguage }) => acceptLanguage === 'kk,ru,en'));
-    assert.ok(results.some(({ name }) => name === 'Olzhay nearby place'));
+    assert.ok(!results.some(({ name }) => name === 'Alligator Aktau'));
     assert.ok(results.some(({ name, city }) => name === 'ОЛЖАЙ' && city === 'Aktau'));
   } finally {
     axios.defaults.adapter = previousAdapter;

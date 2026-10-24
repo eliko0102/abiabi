@@ -72,7 +72,7 @@ class PlaceSearchService {
           'q': query,
           if (city.trim().isNotEmpty) 'city': city.trim(),
           'lang': language,
-          'limit': '8',
+          'limit': '12',
         },
       );
       final response = await _client.get(uri).timeout(_backendTimeout);
