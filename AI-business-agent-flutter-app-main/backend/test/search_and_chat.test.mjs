@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import axios from 'axios';
 import express from 'express';
 import apiRoutes, {
   buildChatPrompt,
@@ -11,6 +12,7 @@ import {
   searchPlaces,
   brandOnly,
   transliterateToCyrillic,
+  transliterationVariants,
 } from '../services/places.js';
 
 test('normalize folds Azerbaijani and Kazakh spellings', () => {
@@ -25,8 +27,65 @@ test('Latin business names fall back to their Cyrillic registration', () => {
   assert.equal(transliterateToCyrillic('Olzha'), 'олжа');
   assert.equal(transliterateToCyrillic('Olzha fitness club'), 'олжа фитнес клуб');
   assert.equal(transliterateToCyrillic('Aktau'), 'актау');
+  assert.deepEqual(transliterationVariants('Olzhay'), ['олжай', 'олжа', 'олжаы']);
+  assert.deepEqual(transliterationVariants('Olzhai'), ['олжай', 'олжа', 'олжаи']);
   assert.equal(brandOnly('Olzha fitness club'), 'Olzha');
   assert.equal(brandOnly('fitness club'), '');
+});
+
+test('Aktau business search includes Kazakh Cyrillic spelling suggestions', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const requestedQueries = [];
+  process.env.TWOGIS_API_KEY = 'test-key';
+  axios.defaults.adapter = async (config) => {
+    const query = String(config.params?.q || '');
+    requestedQueries.push({
+      url: config.url,
+      query,
+      countrycodes: config.params?.countrycodes,
+      acceptLanguage: config.params?.['accept-language'],
+    });
+    const isSuggestEndpoint = config.url.endsWith('/3.0/suggests');
+    const isItemsEndpoint = config.url.endsWith('/3.0/items');
+    const items = query.toLowerCase().includes('olzhay') && isSuggestEndpoint
+      ? [{
+          id: 'olzhay-partial',
+          name: 'Olzhay nearby place',
+          point: { lat: 43.651, lon: 51.161 },
+          adm_div: [{ type: 'city', name: 'Aktau' }],
+        }]
+      : query.includes('олжай') && isItemsEndpoint
+        ? [{
+          id: 'olzhai-aktau',
+          name: 'ОЛЖАЙ',
+          address_name: '30 микрорайон, Aktau',
+          point: { lat: 43.65, lon: 51.16 },
+          adm_div: [{ type: 'city', name: 'Aktau' }],
+        }]
+        : [];
+    return {
+      data: { meta: { code: 200 }, result: { items } },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    const results = await searchPlaces({ q: 'Olzhay', city: 'Aktau', language: 'kk' });
+    assert.ok(requestedQueries.some(({ query }) => query === 'Aktau, олжай'));
+    assert.ok(requestedQueries.some(({ url, query }) => url.endsWith('/3.0/items') && query === 'Aktau, олжай'));
+    assert.ok(requestedQueries.some(({ countrycodes }) => countrycodes === 'kz'));
+    assert.ok(requestedQueries.some(({ acceptLanguage }) => acceptLanguage === 'kk,ru,en'));
+    assert.ok(results.some(({ name }) => name === 'Olzhay nearby place'));
+    assert.ok(results.some(({ name, city }) => name === 'ОЛЖАЙ' && city === 'Aktau'));
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
 });
 
 test('country search returns the country and its places without any API key', async () => {

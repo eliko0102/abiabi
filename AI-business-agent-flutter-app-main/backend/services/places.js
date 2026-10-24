@@ -149,6 +149,17 @@ export function transliterateToCyrillic(value = '') {
     .join('');
 }
 
+export function transliterationVariants(value = '') {
+  const base = transliterateToCyrillic(value);
+  const variants = new Set();
+  if (base.endsWith('ы') || base.endsWith('и')) {
+    variants.add(`${base.slice(0, -1)}й`);
+    variants.add(base.slice(0, -1));
+  }
+  variants.add(base);
+  return [...variants].filter(Boolean);
+}
+
 const CATEGORY_WORDS = new Set([
   'fitness',
   'gym',
@@ -641,16 +652,16 @@ async function twoGisSuggest(query, city, key) {
     { path: '/3.0/suggests', params: { q: scoped, page_size: 8, fields } },
     { path: '/3.0/items', params: { q: scoped, page_size: 8, fields } },
   ];
-  for (const call of calls) {
+  const batches = await Promise.all(calls.map(async (call) => {
     try {
       const response = await axios.get(`${CATALOG_URL}${call.path}`, {
         params: { ...call.params, key },
         timeout: 8000,
       });
       const code = response.data?.meta?.code;
-      if (code && code !== 200) continue;
+      if (code && code !== 200) return [];
       const items = response.data?.result?.items || response.data?.result?.data || [];
-      const results = items
+      return items
         .map((item) => {
           const point = pointOf(item);
           if (!point) return null;
@@ -672,21 +683,34 @@ async function twoGisSuggest(query, city, key) {
           });
         })
         .filter(Boolean);
-      if (results.length > 0) return results;
     } catch (error) {
       console.warn(`2GIS place search failed (${call.path}):`, error.message);
+      return [];
     }
-  }
-  return [];
+  }));
+  return dedupe(batches.flat());
 }
 
 async function nominatimSearch(query, { city = '', countryCode = '', limit = 8, language = 'az' } = {}) {
+  const acceptLanguage = countryCode === 'KZ'
+    ? language === 'ru'
+      ? 'ru,kk,en'
+      : language === 'en'
+        ? 'en,kk,ru'
+        : 'kk,ru,en'
+    : language === 'ru'
+      ? 'ru,az,en'
+      : language === 'kk'
+        ? 'kk,ru,en'
+        : language === 'en'
+          ? 'en,ru,az'
+          : 'az,ru,en';
   const params = {
     q: city && !normalize(query).includes(normalize(city)) ? `${city}, ${query}` : query,
     format: 'jsonv2',
     addressdetails: 1,
     limit,
-    'accept-language': 'az,ru,en',
+    'accept-language': acceptLanguage,
   };
   if (countryCode) params.countrycodes = countryCode.toLowerCase();
   try {
@@ -714,13 +738,15 @@ export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } 
   const languageCode = ['az', 'en', 'ru', 'kk'].includes(language) ? language : 'az';
   const normalizedQuery = normalize(query);
   const countryHit = findCountry(normalizedQuery);
+  const cityHit = findCities(normalize(city))[0] || findCities(normalizedQuery)[0];
+  const country = countryHit?.country || cityHit?.country;
   const key = process.env.TWOGIS_API_KEY;
   const cacheKey = `search:${normalizedQuery}|${normalize(city)}|${languageCode}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
   const staticResults = searchGazetteer(query, countryHit, languageCode);
-  const countryCode = countryHit?.country?.code || '';
+  const countryCode = country?.code || '';
   // Only scope by the user's city when the query is not already country or
   // city level; otherwise "Aktau, Qazaxıstan" hijacks country searches.
   const cityScope = staticResults.length > 0 ? '' : city;
@@ -731,9 +757,19 @@ export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } 
   const skipOsm = Boolean(countryHit) || isExactCityQuery(normalizedQuery);
   const hasStatic = staticResults.length >= 2;
 
-  const collect = async (variant, { osmOnly = false } = {}) => {
+  const collect = async (
+    variant,
+    { osmOnly = false, skipOsmFallback = false } = {},
+  ) => {
     const gisResults = osmOnly ? [] : await twoGisSuggest(variant, cityScope, key);
-    if (skipOsm || hasStatic || (!osmOnly && gisResults.length >= 3)) return gisResults;
+    if (
+      skipOsmFallback ||
+      skipOsm ||
+      hasStatic ||
+      (!osmOnly && gisResults.length >= 3)
+    ) {
+      return gisResults;
+    }
     const osmResults = await nominatimSearch(variant, {
       city: cityScope,
       countryCode,
@@ -745,19 +781,29 @@ export async function searchPlaces({ q, city = '', language = 'az', limit = 8 } 
 
   let merged = dedupe([...staticResults, ...(await collect(query))]);
 
-  // Fallback chain for Latin spellings of CIS businesses/places:
-  //   1. Latin → Cyrillic ("Olzha" → "Олжа")
-  //   2. drop category words ("Olzha fitness club" → "Olzha")
-  //   3. brand + Cyrillic
-  if (merged.length === 0 && !skipOsm && /[a-z]/i.test(query)) {
-    const cyrillic = transliterateToCyrillic(query);
-    if (cyrillic !== normalizedQuery && /[а-я]/.test(cyrillic)) {
-      merged = dedupe([...merged, ...(await collect(cyrillic, { osmOnly: true }))]);
+  const brand = brandOnly(query);
+  if (countryCode === 'KZ' && !skipOsm && /[a-z]/i.test(query)) {
+    // Search common Kazakhstan Cyrillic spellings even when a partial Latin
+    // match exists; 2GIS records local businesses under Russian/Kazakh names.
+    const variants = [
+      ...transliterationVariants(query),
+      ...(brand ? transliterationVariants(brand) : []),
+    ];
+    const variantResults = await Promise.all(
+      [...new Set(variants)]
+        .filter((variant) => normalize(variant) !== normalizedQuery)
+        .map((variant) => collect(variant, { skipOsmFallback: true })),
+    );
+    merged = dedupe([...variantResults.flat(), ...merged]);
+  } else {
+    // Keep the original fallback for searches outside Kazakhstan.
+    if (merged.length === 0 && !skipOsm && /[a-z]/i.test(query)) {
+      const cyrillic = transliterateToCyrillic(query);
+      if (cyrillic !== normalizedQuery && /[а-я]/.test(cyrillic)) {
+        merged = dedupe([...merged, ...(await collect(cyrillic, { osmOnly: true }))]);
+      }
     }
-  }
-  if (merged.length === 0 && !skipOsm) {
-    const brand = brandOnly(query);
-    if (brand) {
+    if (merged.length === 0 && !skipOsm && brand) {
       merged = dedupe([...merged, ...(await collect(brand, { osmOnly: true }))]);
       if (merged.length === 0) {
         const brandCyrillic = transliterateToCyrillic(brand);

@@ -49,8 +49,8 @@ places.js  searchPlaces()
    ├─ 1. Gazetteer: ölkə/şəhər adları az/en/ru/kk + yerli yazılışlar
    │      Qazaxıstan → country + Astana, Almaty, Aktau...
    ├─ 2. 2GIS Catalog API (açar varsa): ünvan və bizneslər
-   └─ 3. Nominatim (açar yoxdursa və ya nəticə azdırsa):
-          accept-language=az,ru,en, addressdetails=1
+      └─ 3. Nominatim (açar yoxdursa və ya nəticə azdırsa):
+         Qazaxıstan üçün countrycodes=kz, accept-language=kk,ru,en
    ▼
 Normallaşdırılmış nəticə:
 { id, name, subtitle, type: country|city|address|poi,
@@ -70,12 +70,10 @@ Backend əlçatmazdırsa `PlaceSearchService` **birbaşa Nominatim-ə** düşür
 Nominatim biznes kataloqu deyil, ona görə biznes adları üçün əlavə iki pillə var:
 
 1. **2GIS Catalog API** — düzgün `TWOGIS_API_KEY` ilə biznes kartı, reytinq, qrafik və rəylər gəlir. Bu, əsas mənbədir.
-2. **Latin → kiril fallback** — Qazaxıstanda obyektlər çox vaxt rus dilində qeydiyyatdadır: OSM-də “Olzha” yox, **“ОЛЖА”** var. Ona görə nəticə boş olanda:
-   - `Olzha` → `Олжа` transliterasiya edilir;
-   - `Olzha fitness club` → kateqoriya sözü atılıb `Olzha` kimi axtarılır;
-   - sonra həmin brendin kiril variantı yoxlanılır.
+2. **Latin → kiril variantları** — Qazaxıstanda obyektlər çox vaxt rus/qazax kirilində qeydiyyatdadır: `Olzhay` və `Olzhai` yazılışları `олжай` və `олжа` variantları ilə, `Olzha` isə `олжа` ilə axtarılır. Kateqoriya sözləri çıxarılan brend variantı da yoxlanılır.
+3. **Qismən nəticələri tamamla** — Aktau şəhəri məlumdursa, backend Nominatim üçün `countrycodes=kz` göndərir və qismən uyğunluq tapılsa belə kiril variantlarını 2GIS-də yoxlayır. `/3.0/suggests` və `/3.0/items` nəticələri birləşdirilir ki, bir endpoint-in qismən nəticəsi digər endpoint-dəki biznesi gizlətməsin.
 
-Nəticə: `Olzha fitness club` + `city=Aktau` → **ОЛЖА, 30 микрорайон, Aktau**. Bu fallback yalnız ad uyğunluğu verir; dəqiq biznes məlumatı üçün 2GIS açarı lazımdır.
+Uyğun biznes 2GIS kataloqunda olduqda `Olzhay` + `city=Aktau` axtarışı **ОЛЖАЙ** kimi kiril qeydiyyatlı nəticəni təklif edə bilər. Bu fallback ad yazılışını genişləndirir; dəqiq biznes məlumatı üçün Render-də ayrıca Catalog API açarı olan `TWOGIS_API_KEY` lazımdır.
 
 > Qeyd: `lib/config/api_config.dart`-dakı açarlı tile URL-i **Catalog API açarı deyil** — catalog sorğuları `403 incorrect key` qaytarır. Render-də `TWOGIS_API_KEY` ayrıca Catalog API açarı ilə verilməlidir.
 
