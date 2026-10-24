@@ -1,11 +1,9 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -270,6 +268,12 @@ class AppLocalizations extends InheritedWidget {
       'hoursAvailable': 'İş qrafiki var',
       'nearestDistance': 'Ən yaxın rəqib',
       'analysisUnavailable': '2GIS analizi əlçatan deyil',
+      'analyzePlace': 'Bu məkanı analiz et',
+      'sendToChat': '2GIS analizini çata göndər',
+      'attachedAnalysis': '2GIS analizi əlavə edildi',
+      'followUps': 'Növbəti suallar',
+      'analysisPrompt':
+          'Bu 2GIS məkan analizini əsas götürərək məkanı qiymətləndir və insan axınını artırmaq üçün 3 konkret addım ver.',
       'analyzing': 'Analiz edilir...',
       'locationPassport': 'PDF Məkan Pasportu',
       'whatsappNegotiation': 'WhatsApp danışıqlar mətni',
@@ -493,6 +497,12 @@ class AppLocalizations extends InheritedWidget {
       'hoursAvailable': 'Hours available',
       'nearestDistance': 'Nearest competitor',
       'analysisUnavailable': '2GIS analysis unavailable',
+      'analyzePlace': 'Analyze this place',
+      'sendToChat': 'Send 2GIS analysis to chat',
+      'attachedAnalysis': '2GIS analysis attached',
+      'followUps': 'Follow-up questions',
+      'analysisPrompt':
+          'Using this 2GIS location analysis, assess the place and give 3 concrete steps to increase foot traffic.',
       'analyzing': 'Analyzing...',
       'locationPassport': 'PDF location passport',
       'whatsappNegotiation': 'WhatsApp negotiation text',
@@ -720,6 +730,12 @@ class AppLocalizations extends InheritedWidget {
       'hoursAvailable': 'Есть график',
       'nearestDistance': 'Ближайший конкурент',
       'analysisUnavailable': 'Анализ 2GIS недоступен',
+      'analyzePlace': 'Анализировать это место',
+      'sendToChat': 'Отправить анализ 2GIS в чат',
+      'attachedAnalysis': 'Анализ 2GIS прикреплён',
+      'followUps': 'Следующие вопросы',
+      'analysisPrompt':
+          'На основе этого анализа 2GIS оцени место и дай 3 конкретных шага для роста пешеходного трафика.',
       'analyzing': 'Анализируется...',
       'locationPassport': 'PDF-паспорт места',
       'whatsappNegotiation': 'Текст переговоров в WhatsApp',
@@ -944,6 +960,12 @@ class AppLocalizations extends InheritedWidget {
       'hoursAvailable': 'Кесте бар',
       'nearestDistance': 'Ең жақын бәсекелес',
       'analysisUnavailable': '2GIS талдауы қолжетімсіз',
+      'analyzePlace': 'Бұл орынды талдау',
+      'sendToChat': '2GIS талдауын чатқа жіберу',
+      'attachedAnalysis': '2GIS талдауы қосылды',
+      'followUps': 'Келесі сұрақтар',
+      'analysisPrompt':
+          'Осы 2GIS талдауына сүйеніп, орынды бағала және жаяу трафикті арттыру үшін 3 нақты қадам бер.',
       'analyzing': 'Талдануда...',
       'locationPassport': 'PDF орын паспорты',
       'whatsappNegotiation': 'WhatsApp келіссөз мәтіні',
@@ -1203,11 +1225,26 @@ class _AiBusinessAgentAppState extends State<AiBusinessAgentApp> {
   }
 }
 
+/// A 2GIS report handed from the map/report screens to the assistant.
+/// ChatScreen consumes it, keeps the analysis as hidden context for every
+/// follow-up question and never re-geocodes the address again.
+class ChatHandoff {
+  const ChatHandoff({required this.id, required this.analysis});
+
+  final int id;
+  final Map<String, dynamic> analysis;
+}
+
 class LocationAnalysisController extends ChangeNotifier {
   final BusinessApiService _service = BusinessApiService();
   Map<String, dynamic>? analysis;
   bool isAnalyzing = false;
   String mapProvider = ApiConfig.mapsProvider;
+
+  /// Set when a 2GIS report is sent to the assistant.
+  final ValueNotifier<ChatHandoff?> chatHandoff = ValueNotifier<ChatHandoff?>(
+    null,
+  );
 
   void setMapProvider(String provider) {
     mapProvider = provider;
@@ -1224,12 +1261,26 @@ class LocationAnalysisController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Hands the current live analysis to the chat tab. The chat does not
+  /// re-search the address; the exact snapshot that produced the report is
+  /// attached as the grounding context.
+  void sendAnalysisToChat() {
+    final current = analysis;
+    if (current == null) return;
+    chatHandoff.value = ChatHandoff(
+      id: DateTime.now().microsecondsSinceEpoch,
+      analysis: current,
+    );
+  }
+
   Future<void> analyze({
     required String city,
     required String businessType,
     String address = '',
+    Map<String, dynamic>? point,
   }) async {
     isAnalyzing = true;
+    final previousAnalysis = analysis;
     analysis = null;
     notifyListeners();
     try {
@@ -1238,9 +1289,11 @@ class LocationAnalysisController extends ChangeNotifier {
         businessType: businessType,
         address: address,
         mapProvider: mapProvider,
+        point: point,
       );
     } catch (e) {
-      analysis = null;
+      // A failed search must not erase the report the user already has.
+      analysis = previousAnalysis;
       rethrow;
     } finally {
       isAnalyzing = false;
@@ -1263,6 +1316,12 @@ class LocationAnalysisController extends ChangeNotifier {
   }
 
   Map<String, dynamic>? get contextForAi => analysis;
+
+  @override
+  void dispose() {
+    chatHandoff.dispose();
+    super.dispose();
+  }
 }
 
 class HomeShell extends StatefulWidget {
@@ -1669,6 +1728,7 @@ class _HomeShellState extends State<HomeShell> {
                 MapScreen(
                   controller: _locationController,
                   city: _confirmedCity,
+                  onAskAi: _askAiAboutAnalysis,
                 ),
                 ChatScreen(controller: _locationController),
                 ProfileScreen(
@@ -1715,6 +1775,7 @@ class _HomeShellState extends State<HomeShell> {
                 _activeFlow = null;
                 _selectedIndex = 1;
               }),
+              onAskAi: _askAiAboutAnalysis,
             ),
           if (_showNotifications)
             _NotificationsOverlay(
@@ -1749,16 +1810,37 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// Sends the live 2GIS report to the assistant tab. The handoff carries the
+  /// analysis snapshot, so the chat does not geocode or re-run the audit.
+  void _askAiAboutAnalysis() {
+    if (_locationController.analysis == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).t('analysisUnavailable')),
+        ),
+      );
+      return;
+    }
+    _locationController.sendAnalysisToChat();
+    setState(() {
+      _activeFlow = null;
+      _selectedIndex = 2;
+      _showNotifications = false;
+    });
+  }
+
   Future<Map<String, dynamic>?> _runAudit({
     required String businessType,
     required List<String> problems,
     required String address,
+    Map<String, dynamic>? point,
   }) async {
     await _locationController.analyze(
       city: address,
       businessType:
           '$businessType${problems.isEmpty ? '' : ' — ${problems.join(', ')}'}',
       address: address,
+      point: point,
     );
     await _saveAudit(address, businessType, flowType: 'old');
     if (!mounted) return _locationController.analysis;
@@ -1770,18 +1852,21 @@ class _HomeShellState extends State<HomeShell> {
     return _locationController.analysis;
   }
 
-  Future<void> _runChatLocationAnalysis(
-    String businessType,
-    String address,
-    String city,
-  ) async {
+  Future<Map<String, dynamic>?> _runChatLocationAnalysis({
+    required String businessType,
+    required String address,
+    required String city,
+    Map<String, dynamic>? point,
+  }) async {
     final analysisCity = city.trim().isEmpty ? address : city;
     await _locationController.analyze(
       city: analysisCity,
       businessType: businessType,
       address: address,
+      point: point,
     );
     await _saveAudit(address, businessType, flowType: 'new');
+    return _locationController.analysis;
   }
 }
 
@@ -3082,9 +3167,15 @@ class _CityPin {
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key, required this.controller, this.city = ''});
+  const MapScreen({
+    super.key,
+    required this.controller,
+    required this.onAskAi,
+    this.city = '',
+  });
 
   final LocationAnalysisController controller;
+  final VoidCallback onAskAi;
   final String city;
 
   @override
@@ -3106,8 +3197,8 @@ class _MapScreenState extends State<MapScreen> {
 
   _CityPin? _selected;
   _CityPin? _customPin;
+  Map<String, dynamic>? _selectedPlace;
   String _search = '';
-  bool _isSearching = false;
   String? _lastAnalysisUpdate;
   LatLng? _pendingAnalysisPoint;
   bool _locatingDevice = false;
@@ -3243,17 +3334,25 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _focusCity(_CityPin city) async {
-    setState(() => _selected = city);
+    setState(() {
+      _selected = city;
+      _selectedPlace = null;
+    });
     _mapController.move(city.point, 6.2);
     await _refreshAnalysis(city);
   }
 
-  Future<void> _refreshAnalysis(_CityPin pin) async {
+  Future<void> _refreshAnalysis(
+    _CityPin pin, {
+    Map<String, dynamic>? point,
+    String? city,
+  }) async {
     try {
       await widget.controller.analyze(
-        city: pin.name,
+        city: (city == null || city.trim().isEmpty) ? pin.name : city.trim(),
         businessType: 'business',
         address: pin.name,
+        point: point,
       );
     } catch (_) {
       if (!mounted) return;
@@ -3265,99 +3364,81 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _searchNominatim(String query) async {
-    final scopedQuery = query.contains(',') || widget.city.isEmpty
-        ? query
-        : '${widget.city}, $query';
-    final queries = <String>{
-      scopedQuery,
-      query,
-      if (widget.city.isNotEmpty) widget.city,
-    };
-    for (final candidate in queries) {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-        'q': candidate,
-        'format': 'jsonv2',
-        'limit': '5',
-      });
-      final response = await http
-          .get(
-            uri,
-            headers: const {
-              'User-Agent': 'AI-Business-Agent/1.0 (address search)',
-              'Accept-Language': 'az,en,ru',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) continue;
-      final decoded = jsonDecode(response.body);
-      if (decoded is List && decoded.isNotEmpty) {
-        return decoded.whereType<Map<String, dynamic>>().toList();
-      }
-    }
-    return const [];
+  LatLng? _placePoint(Map<String, dynamic> place) {
+    final lat = double.tryParse(place['lat']?.toString() ?? '');
+    final lon = double.tryParse(place['lon']?.toString() ?? '');
+    if (lat == null || lon == null) return null;
+    return LatLng(lat, lon);
   }
 
-  Future<void> _searchAddress() async {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
-    setState(() => _isSearching = true);
-    try {
-      // Search and geocode through the backend's 2GIS Catalog API first.
-      // This keeps the selected address and the map marker in the same source.
-      await widget.controller.analyze(
-        city: widget.city.isNotEmpty ? widget.city : query,
-        businessType: 'business',
-        address: query,
-      );
-      final analysis = widget.controller.analysis;
-      final point = _analysisPoint(analysis);
-      if (point != null) {
-        final pin = _CityPin(
-          name: (analysis?['address'] ?? query).toString(),
-          point: point,
-        );
-        if (!mounted) return;
-        setState(() {
-          _customPin = pin;
-          _selected = pin;
-          _showMapInfo = true;
-        });
-        _mapController.move(point, 16);
-        return;
-      }
-      throw Exception('2GIS address not found');
-    } catch (_) {
-      // Keep OSM as a fallback when the backend/key is unavailable.
-      try {
-        final results = await _searchNominatim(query);
-        if (results.isEmpty) throw Exception('Address not found');
-        final result = results.first;
-        final lat = double.parse(result['lat'].toString());
-        final lon = double.parse(result['lon'].toString());
-        final pin = _CityPin(
-          name: (result['display_name'] ?? query).toString(),
-          point: LatLng(lat, lon),
-        );
-        if (!mounted) return;
-        setState(() {
-          _customPin = pin;
-          _selected = pin;
-          _showMapInfo = true;
-        });
-        _mapController.move(pin.point, 15);
-        await _refreshAnalysis(pin);
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).t('addressNotFound')),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
+  Map<String, double>? _placeBounds(Map<String, dynamic> place) {
+    final raw = place['bbox'];
+    if (raw is! Map) return null;
+    final minLat = double.tryParse(raw['min_lat']?.toString() ?? '');
+    final maxLat = double.tryParse(raw['max_lat']?.toString() ?? '');
+    final minLon = double.tryParse(raw['min_lon']?.toString() ?? '');
+    final maxLon = double.tryParse(raw['max_lon']?.toString() ?? '');
+    if (minLat == null || maxLat == null || minLon == null || maxLon == null) {
+      return null;
     }
+    return {
+      'min_lat': minLat,
+      'max_lat': maxLat,
+      'min_lon': minLon,
+      'max_lon': maxLon,
+    };
+  }
+
+  /// Applies a place picked in the search box. Country and city results zoom
+  /// the map (no analysis request), addresses and POIs drop a pin. Analysis is
+  /// a separate explicit tap so a plain search never depends on 2GIS.
+  Future<void> _applyPlace(Map<String, dynamic> place) async {
+    final point = _placePoint(place);
+    if (point == null || !mounted) return;
+    final type = place['type']?.toString() ?? 'poi';
+    final name = (place['name'] ?? _searchController.text).toString();
+    final pin = _CityPin(name: name, point: point);
+    setState(() {
+      // A country is an area, not a point: fit its bounds without a stray pin.
+      _customPin = type == 'country' ? null : pin;
+      _selected = pin;
+      _selectedPlace = place;
+      _showMapInfo = true;
+    });
+    if (type == 'country' || type == 'city') {
+      final bounds = _placeBounds(place);
+      if (bounds != null) {
+        try {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds(
+                LatLng(bounds['min_lat']!, bounds['min_lon']!),
+                LatLng(bounds['max_lat']!, bounds['max_lon']!),
+              ),
+              padding: const EdgeInsets.fromLTRB(36, 100, 36, 210),
+              maxZoom: type == 'city' ? 13 : 10,
+            ),
+          );
+          return;
+        } catch (_) {
+          // Fall through to a plain move when the camera is not ready.
+        }
+      }
+    }
+    final zoom = double.tryParse(place['zoom']?.toString() ?? '') ?? 15;
+    _mapController.move(point, zoom.clamp(3, 18).toDouble());
+  }
+
+  Future<void> _analyzeSelected() async {
+    final pin = _selected;
+    if (pin == null) return;
+    final place = _selectedPlace;
+    final city = place?['city']?.toString() ?? '';
+    await _refreshAnalysis(
+      pin,
+      point: {'lat': pin.point.latitude, 'lon': pin.point.longitude},
+      city: city,
+    );
   }
 
   @override
@@ -3446,8 +3527,8 @@ class _MapScreenState extends State<MapScreen> {
                     hintText: loc.t('searchAddressHint'),
                     isBottomInput: false,
                     city: widget.city,
-                    onSelected: (_) => _searchAddress(),
-                    onSubmitted: _searchAddress,
+                    language: loc.locale.languageCode,
+                    onSelected: _applyPlace,
                   ),
                 ),
               ],
@@ -3577,6 +3658,48 @@ class _MapScreenState extends State<MapScreen> {
                                 icon: const Icon(Icons.navigation),
                               ),
                             ],
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (_selected != null &&
+                                _selectedPlace != null &&
+                                _selectedPlace!['type'] != 'country')
+                              FilledButton.icon(
+                                onPressed: widget.controller.isAnalyzing
+                                    ? null
+                                    : _analyzeSelected,
+                                icon: widget.controller.isAnalyzing
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.analytics_outlined,
+                                        size: 16,
+                                      ),
+                                label: Text(
+                                  widget.controller.isAnalyzing
+                                      ? loc.t('analyzing')
+                                      : loc.t('analyzePlace'),
+                                ),
+                              ),
+                            if (analysis != null)
+                              OutlinedButton.icon(
+                                onPressed: widget.onAskAi,
+                                icon: const Icon(
+                                  Icons.smart_toy_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(loc.t('sendToChat')),
+                              ),
                           ],
                         ),
                         Wrap(
@@ -4382,10 +4505,26 @@ class _ChatScreenState extends State<ChatScreen> {
   final FlutterTts _tts = FlutterTts();
   bool _isListening = false;
 
+  /// The exact 2GIS snapshot attached from the map/report screens. Every
+  /// follow-up question in this conversation is answered against it.
+  Map<String, dynamic>? _analysisContext;
+  List<String> _followUps = const [];
+  int? _handledHandoffId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Keep the latest live report as context when the user opens the chat tab
+    // directly instead of using the handoff button.
+    _analysisContext = widget.controller.analysis;
+    widget.controller.chatHandoff.addListener(_onHandoff);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onHandoff());
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_messages.length == 1) {
+    if (_messages.length == 1 && _messages[0].text.isEmpty) {
       _messages[0] = _ChatMessage(
         author: 'assistant',
         text: AppLocalizations.of(context).t('assistantWelcome'),
@@ -4395,6 +4534,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    widget.controller.chatHandoff.removeListener(_onHandoff);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -4412,50 +4552,90 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessage() async {
-    final prompt = _controller.text.trim();
-    if (prompt.isEmpty || _isSending) return;
+  /// Consumes the report handed over from the map/report screen: shows what
+  /// was attached, then asks the assistant to analyse it in one step.
+  void _onHandoff() {
+    final handoff = widget.controller.chatHandoff.value;
+    if (handoff == null || handoff.id == _handledHandoffId) return;
+    _handledHandoffId = handoff.id;
+    // Clear before building so a tab rebuild cannot replay the same report.
+    widget.controller.chatHandoff.value = null;
+    if (!mounted) return;
+    setState(() {
+      _analysisContext = handoff.analysis;
+      _followUps = const [];
+      _messages.add(
+        _ChatMessage(
+          author: 'assistant',
+          text: _formatAttachedAnalysis(handoff.analysis),
+          isAnalysis: true,
+        ),
+      );
+    });
+    _scrollToBottom();
+    _sendMessage(preset: AppLocalizations.of(context).t('analysisPrompt'));
+  }
 
+  List<Map<String, String>> _history() {
+    return _messages
+        .where((message) => message.text.trim().isNotEmpty)
+        .skip(1)
+        .take(8)
+        .map(
+          (message) => {
+            'role': message.author == 'user' ? 'user' : 'assistant',
+            'content': message.text,
+          },
+        )
+        .toList();
+  }
+
+  Future<void> _sendMessage({String? preset}) async {
+    final prompt = (preset ?? _controller.text).trim();
+    if (prompt.isEmpty || _isSending) return;
+    if (preset == null) {
+      _controller.clear();
+    }
+
+    // Capture the conversation before adding the current prompt: the backend
+    // appends it as the final user turn itself.
+    final conversation = _history();
     setState(() {
       _messages.add(_ChatMessage(author: 'user', text: prompt));
       _isSending = true;
-      _controller.clear();
+      _followUps = const [];
     });
     _scrollToBottom();
 
+    final loc = AppLocalizations.of(context);
+    final language = loc.locale.languageCode;
+    final contextForAi = _analysisContext ?? widget.controller.analysis;
+
     try {
-      await widget.controller.analyzeFromPrompt(prompt);
-      final liveAnalysis = widget.controller.contextForAi;
-      if (liveAnalysis != null && mounted) {
-        setState(() {
-          _messages.add(
-            _ChatMessage(
-              author: 'assistant',
-              text: _formatLiveAnalysis(liveAnalysis),
-            ),
-          );
-        });
-      }
-      final answer = await _aiService.generateResponse(
-        prompt,
-        language: AppLocalizations.of(context).locale.languageCode,
-        locationContext: widget.controller.contextForAi,
+      final reply = await _aiService.chat(
+        prompt: prompt,
+        language: language,
+        locationContext: contextForAi,
+        conversation: conversation,
       );
       if (!mounted) return;
       setState(() {
-        _messages.add(_ChatMessage(author: 'assistant', text: answer));
+        _messages.add(_ChatMessage(author: 'assistant', text: reply.message));
+        _followUps = reply.followUps;
         _isSending = false;
       });
-      await _tts.setLanguage('az-AZ');
-      await _tts.speak(answer);
-    } catch (e) {
+      await _tts.setLanguage(switch (language) {
+        'en' => 'en-US',
+        'ru' => 'ru-RU',
+        'kk' => 'kk-KZ',
+        _ => 'az-AZ',
+      });
+      await _tts.speak(reply.message);
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _messages.add(
-          _ChatMessage(
-            author: 'assistant',
-            text: AppLocalizations.of(context).t('aiBackendError'),
-          ),
+          _ChatMessage(author: 'assistant', text: loc.t('aiBackendError')),
         );
         _isSending = false;
       });
@@ -4463,18 +4643,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  String _formatLiveAnalysis(Map<String, dynamic> analysis) {
+  String _formatAttachedAnalysis(Map<String, dynamic> analysis) {
     final loc = AppLocalizations.of(context);
+    final address = analysis['address']?.toString() ?? loc.t('mapTitle');
     final score = analysis['score']?.toString() ?? '—';
-    final traffic = analysis['pedestrian_traffic']?.toString() ?? '—';
     final competitors = analysis['competitors_500m']?.toString() ?? '—';
-    final nearest = analysis['nearest_competitor_meters']?.toString() ?? '—';
-    return '${loc.t('liveReportTitle')}\n'
-        '• ${loc.t('liveLocationIndex')}: $score/100\n'
-        '• ${loc.t('liveTrafficIndex')}: $traffic/100\n'
-        '• ${loc.t('liveCompetitors')}: $competitors\n'
-        '• ${loc.t('liveNearest')}: $nearest m\n\n'
-        '${loc.t('liveMapHint')}';
+    final stops = analysis['transport_stops_1km']?.toString() ?? '—';
+    final parking = analysis['parking_1km']?.toString() ?? '—';
+    return '${loc.t('attachedAnalysis')}: $address\n'
+        '• ${loc.t('locationIndex')}: $score/100\n'
+        '• ${loc.t('competitors')}: $competitors\n'
+        '• ${loc.t('stops')}: $stops\n'
+        '• ${loc.t('parking')}: $parking';
   }
 
   Future<void> _toggleListening() async {
@@ -4495,8 +4675,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendPreset(String value) {
-    _controller.text = value;
-    _sendMessage();
+    _sendMessage(preset: value);
   }
 
   Widget _botBubble(String text) {
@@ -4583,6 +4762,18 @@ class _ChatScreenState extends State<ChatScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (_analysisContext != null)
+                        Text(
+                          '${loc.t('attachedAnalysis')}: '
+                          '${_analysisContext!['address'] ?? ''}',
+                          style: TextStyle(
+                            color: scheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),
@@ -4614,16 +4805,68 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? null
                             : Border.all(color: Theme.of(context).dividerColor),
                       ),
-                      child: Text(
-                        message.text,
-                        style: TextStyle(
-                          color: isUser ? Colors.white : null,
-                          height: 1.35,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (message.isAnalysis) ...[
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.map_outlined,
+                                  size: 14,
+                                  color: scheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  loc.t('attachedAnalysis'),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          Text(
+                            message.text,
+                            style: TextStyle(
+                              color: isUser ? Colors.white : null,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 }),
+                if (_followUps.isNotEmpty && !_isSending) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    loc.t('followUps'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.outline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _followUps
+                        .map(
+                          (prompt) => ActionChip(
+                            label: Text(prompt),
+                            onPressed: _isSending
+                                ? null
+                                : () => _sendPreset(prompt),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
                 if (_messages.length == 1) ...[
                   const SizedBox(height: 4),
                   _optionButton(
@@ -4743,10 +4986,17 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _ChatMessage {
-  const _ChatMessage({required this.author, required this.text});
+  const _ChatMessage({
+    required this.author,
+    required this.text,
+    this.isAnalysis = false,
+  });
 
   final String author;
   final String text;
+
+  /// Marks the bubble that carries the attached 2GIS snapshot.
+  final bool isAnalysis;
 }
 
 // ============================================================

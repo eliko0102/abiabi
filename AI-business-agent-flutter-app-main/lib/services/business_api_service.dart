@@ -13,12 +13,16 @@ class BusinessApiService {
     required String businessType,
     String address = '',
     String mapProvider = '2gis',
+    Map<String, dynamic>? point,
   }) async {
     return _post('/api/location-analysis', {
       'city': city,
       'businessType': businessType,
       'address': address,
       'mapProvider': mapProvider,
+      // The point picked in the address autocomplete. The backend analyses the
+      // exact place instead of geocoding the typed text a second time.
+      if (point != null) 'point': point,
     });
   }
 
@@ -27,12 +31,14 @@ class BusinessApiService {
     required String businessType,
     String address = '',
     String mapProvider = '2gis',
+    Map<String, dynamic>? point,
   }) {
     return analyzeLocation(
       city: city,
       businessType: businessType,
       address: address,
       mapProvider: mapProvider,
+      point: point,
     );
   }
 

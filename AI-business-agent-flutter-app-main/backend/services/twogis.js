@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { resolvePlace } from './places.js';
 
 const CATALOG_URL = 'https://catalog.api.2gis.com';
 
@@ -91,76 +92,6 @@ function parseReviewCount(item) {
   return Number.isFinite(num) && num > 0 ? num : 0;
 }
 
-export async function suggest2GisAddress(q, city = '') {
-  const key = process.env.TWOGIS_API_KEY;
-  const normalizedQuery = q.trim();
-  const query = city && !normalizedQuery.includes(',') && !normalizedQuery.toLowerCase().includes(city.toLowerCase())
-    ? `${city}, ${normalizedQuery}`
-    : normalizedQuery;
-  if (key) {
-    try {
-      const response = await catalogGet('/3.0/suggest', {
-        q: query,
-        page_size: 7,
-        fields: 'items.point,items.full_name,items.address_name,items.adm_div',
-      }, key);
-      const suggestions = itemsFrom(response).map((item) => {
-        const cityDiv = Array.isArray(item.adm_div)
-          ? item.adm_div.find((division) => division?.type === 'city')
-          : null;
-        return {
-          name: item.full_name || item.address_name || item.name,
-          city: cityDiv?.name || city || '',
-          point: pointOf(item),
-        };
-      });
-      if (suggestions.length > 0) return suggestions;
-    } catch (error) {
-      console.warn('2GIS Suggest error:', error.message);
-    }
-
-    try {
-      const response = await catalogGet('/3.0/items', {
-        q: query,
-        page_size: 7,
-        fields: 'items.point,items.full_name,items.address_name,items.name,items.adm_div',
-      }, key);
-      const suggestions = itemsFrom(response).map((item) => {
-        const cityDiv = Array.isArray(item.adm_div)
-          ? item.adm_div.find((division) => division?.type === 'city')
-          : null;
-        return {
-          name: item.full_name || item.address_name || item.name,
-          city: cityDiv?.name || city || '',
-          point: pointOf(item),
-        };
-      }).filter((item) => item.name);
-      if (suggestions.length > 0) return suggestions;
-    } catch (error) {
-      console.warn('2GIS Items suggestion error:', error.message);
-    }
-  }
-
-  try {
-    const response = await axios.get('https://nominatim.openstreetmap.org/search', {
-      params: { q: query, format: 'jsonv2', limit: 5 },
-      headers: { 'User-Agent': 'AI-Business-Agent/1.0 (address search)' },
-      timeout: 10000,
-    });
-    return (Array.isArray(response.data) ? response.data : []).map((item) => ({
-      name: item.display_name || item.name || query,
-      city: item.address?.city || item.address?.town || item.address?.state || city || '',
-      point: {
-        lat: Number(item.lat),
-        lon: Number(item.lon),
-      },
-    })).filter((item) => item.point && Number.isFinite(item.point.lat) && Number.isFinite(item.point.lon));
-  } catch (error) {
-    console.warn('Address fallback error:', error.message);
-    return [];
-  }
-}
-
 async function geocode(address, city, key) {
   const queries = [...new Set([
     city && address && city !== address ? `${city}, ${address}` : null,
@@ -223,23 +154,25 @@ async function geocode(address, city, key) {
     }
   }
 
-  // 3-cü Pillə: 2GIS Suggest API axtarışı
+  // 3-cü Pillə: dil dəstəkli ümumi məkan axtarışı (ölkə, şəhər, ünvan).
+  // 2GIS ünvanı tapmadıqda və ya açarı olmadıqda belə axtarış işləməlidir.
   for (const query of queries) {
     try {
-      const suggestions = await suggest2GisAddress(query, city);
-      const matched = suggestions.find(s => s.point);
-      if (matched) {
+      const place = await resolvePlace(query, city);
+      if (place) {
         return {
-          source: '2GIS Suggest API',
+          source: `Ümumi məkan axtarışı (${place.source})`,
           item: null,
-          point: matched.point,
-          address: matched.name,
+          point: place.point,
+          address: place.name,
         };
       }
-    } catch (_) {}
+    } catch (error) {
+      lastError = lastError || error;
+    }
   }
 
-  throw lastError || new Error(`2GIS ünvanı və ya obyekti tapmadı: "${address || city}"`);
+  throw lastError || new Error(`Ünvan və ya obyekt tapmadı: "${address || city}"`);
 }
 
 async function nearby(key, point, query, type = 'branch', fields) {
@@ -284,11 +217,26 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-export async function analyze2GisLocation({ address, city, businessType, provider }) {
+export async function analyze2GisLocation({ address, city, businessType, provider, point: selectedPoint }) {
   const key = process.env.TWOGIS_API_KEY;
   if (!key) throw new Error('TWOGIS_API_KEY konfiqurasiya edilməyib');
 
-  const geocoded = await geocode(address || city, city, key);
+  // The client may already have resolved the exact place from the address
+  // autocomplete. Reusing that point avoids geocoding the same text again in
+  // the wrong city and keeps the analysis marker where the user tapped.
+  const directPoint =
+    selectedPoint &&
+    Number.isFinite(Number(selectedPoint.lat)) &&
+    Number.isFinite(Number(selectedPoint.lon))
+      ? { lat: Number(selectedPoint.lat), lon: Number(selectedPoint.lon) }
+      : null;
+  const geocoded = directPoint
+    ? {
+        point: directPoint,
+        address: address || city || 'Seçilmiş nöqtə',
+        source: 'İstifadəçinin seçdiyi nöqtə',
+      }
+    : await geocode(address || city, city, key);
   const point = geocoded.point;
   const businessQuery = normalizeBusinessQuery(businessType);
 

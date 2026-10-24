@@ -16,6 +16,17 @@ typedef AuditCallback =
       required String businessType,
       required List<String> problems,
       required String address,
+      Map<String, dynamic>? point,
+    });
+
+/// Location analysis started from the new-point assistant. It returns the
+/// analysis so the conversation can keep using it as grounding context.
+typedef NewPointAnalyzeCallback =
+    Future<Map<String, dynamic>?> Function({
+      required String businessType,
+      required String address,
+      required String city,
+      Map<String, dynamic>? point,
     });
 
 Future<String?> detectUserLocationCity() async {
@@ -29,28 +40,29 @@ Future<String?> detectUserLocationCity() async {
     if (permission != LocationPermission.denied &&
         permission != LocationPermission.deniedForever &&
         await Geolocator.isLocationServiceEnabled()) {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        final url = Uri.https('nominatim.openstreetmap.org', '/reverse', {
-          'format': 'json',
-          'lat': position.latitude.toString(),
-          'lon': position.longitude.toString(),
-        });
-        final response = await http.get(
-          url,
-          headers: const {'User-Agent': 'AI-Business-Agent'},
-        );
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final address = data['address'] as Map<String, dynamic>? ?? {};
-          final city = address['city'] ?? address['town'] ?? address['municipality'];
-          if (city != null && city.toString().trim().isNotEmpty) {
-            detectedCity = city.toString().trim();
-          }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      final url = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'format': 'json',
+        'lat': position.latitude.toString(),
+        'lon': position.longitude.toString(),
+      });
+      final response = await http.get(
+        url,
+        headers: const {'User-Agent': 'AI-Business-Agent'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final address = data['address'] as Map<String, dynamic>? ?? {};
+        final city =
+            address['city'] ?? address['town'] ?? address['municipality'];
+        if (city != null && city.toString().trim().isNotEmpty) {
+          detectedCity = city.toString().trim();
         }
+      }
     }
   } catch (_) {
     // GPS əlçatan olmadıqda istifadəçi şəhəri dialoqdan seçə bilər.
@@ -104,14 +116,13 @@ class ProductDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final oldPointCount = audits
-      .where(
-        (audit) =>
-          audit['flowType'] == null || audit['flowType'] == 'old',
-      )
-      .length;
+        .where(
+          (audit) => audit['flowType'] == null || audit['flowType'] == 'old',
+        )
+        .length;
     final newPointCount = audits
-      .where((audit) => audit['flowType'] == 'new')
-      .length;
+        .where((audit) => audit['flowType'] == 'new')
+        .length;
     final scheme = Theme.of(context).colorScheme;
     final t = (String key) => FlowLocalizations.t(localeCode, key);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -486,6 +497,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
   bool _otherBusiness = false;
   bool _otherProblem = false;
   bool _isLoading = false;
+  Map<String, dynamic>? _selectedPlace;
 
   @override
   void dispose() {
@@ -526,6 +538,7 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
         businessType: business,
         problems: problems,
         address: _addressController.text.trim(),
+        point: _selectedPlacePoint(),
       );
     } catch (error) {
       if (mounted) {
@@ -540,6 +553,21 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Map<String, dynamic>? _selectedPlacePoint() {
+    final place = _selectedPlace;
+    if (place == null) return null;
+    // The text may have been edited after picking a suggestion; a stale point
+    // must never override what the user actually typed.
+    if ((place['name'] ?? '').toString().trim() !=
+        _addressController.text.trim()) {
+      return null;
+    }
+    final lat = double.tryParse(place['lat']?.toString() ?? '');
+    final lon = double.tryParse(place['lon']?.toString() ?? '');
+    if (lat == null || lon == null) return null;
+    return {'lat': lat, 'lon': lon};
   }
 
   @override
@@ -705,7 +733,8 @@ class _OldPointSurveyScreenState extends State<OldPointSurveyScreen> {
                 hintText: t('addressHint'),
                 isBottomInput: true,
                 city: widget.city,
-                onSelected: (_) => setState(() {}),
+                language: widget.localeCode,
+                onSelected: (place) => setState(() => _selectedPlace = place),
               ),
             ),
           ),
@@ -777,6 +806,7 @@ class AuditReportScreen extends StatelessWidget {
     required this.address,
     required this.onBack,
     required this.onMap,
+    required this.onAskAi,
     required this.localeCode,
   });
 
@@ -784,6 +814,9 @@ class AuditReportScreen extends StatelessWidget {
   final String address;
   final VoidCallback onBack;
   final VoidCallback onMap;
+
+  /// Sends this exact 2GIS report to the chat and asks for the analysis.
+  final VoidCallback onAskAi;
   final String localeCode;
 
   @override
@@ -1328,6 +1361,10 @@ class AuditReportScreen extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.auto_awesome, color: _accent),
               title: Text(FlowLocalizations.t(localeCode, 'askAiReport')),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                onAskAi();
+              },
             ),
             ListTile(
               leading: const Icon(Icons.map_outlined),
@@ -1599,7 +1636,7 @@ class NewPointAssistantScreen extends StatefulWidget {
   });
   final VoidCallback onBack;
   final VoidCallback onMap;
-  final Future<void> Function(String businessType, String address, String city) onAnalyze;
+  final NewPointAnalyzeCallback onAnalyze;
   final String localeCode;
   final String initialCity;
 
@@ -1618,6 +1655,8 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
   String? _address;
   bool _loading = false;
   String _city = '';
+  Map<String, dynamic>? _selectedPlace;
+  Map<String, dynamic>? _analysisContext;
 
   String _t(String key) => FlowLocalizations.t(widget.localeCode, key);
 
@@ -1700,15 +1739,39 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     if (_business == null || _address == null) return;
     setState(() => _loading = true);
     try {
-      await widget.onAnalyze(_t(_business!), _address!, _city);
+      final point = _selectedPlacePoint();
+      final analysis = await widget.onAnalyze(
+        businessType: _t(_business!),
+        address: _address!,
+        city: _city,
+        point: point,
+      );
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _analysisContext = analysis;
+        _selectedPlace = null;
+      });
       _add('assistant', _t('analysisReady'), actions: const ['mapZones']);
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
       _add('assistant', '${_t('analysisFailed')}: $error');
     }
+  }
+
+  Map<String, dynamic>? _selectedPlacePoint() {
+    final place = _selectedPlace;
+    if (place == null) return null;
+    // Compare with the address that actually started the analysis: the input
+    // is cleared before _finishFlow runs.
+    if ((place['name'] ?? '').toString().trim() != (_address ?? '').trim()) {
+      return null;
+    }
+    final lat = double.tryParse(place['lat']?.toString() ?? '');
+    final lon = double.tryParse(place['lon']?.toString() ?? '');
+    if (lat == null || lon == null) return null;
+    return {'lat': lat, 'lon': lon};
   }
 
   Future<void> _send() async {
@@ -1744,6 +1807,9 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
     final answer = await _ai.generateResponse(
       text,
       language: widget.localeCode,
+      // After a 2GIS analysis this chat answers follow-ups from the same
+      // report instead of starting a new search.
+      locationContext: _analysisContext,
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -1876,7 +1942,11 @@ class _NewPointAssistantScreenState extends State<NewPointAssistantScreen> {
                     hintText: _t('chatHint'),
                     isBottomInput: true,
                     city: _city,
-                    onSelected: (_) => _send(),
+                    language: widget.localeCode,
+                    onSelected: (place) {
+                      _selectedPlace = place;
+                      _send();
+                    },
                     onSubmitted: _send,
                   ),
                 ),

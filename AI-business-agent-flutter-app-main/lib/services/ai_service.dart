@@ -2,6 +2,24 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
+/// Assistant reply plus the deterministic follow-up chips the backend builds
+/// for the current 2GIS analysis.
+class AiChatReply {
+  const AiChatReply({
+    required this.message,
+    this.followUps = const [],
+    this.analysisUsed = false,
+    this.analysisAddress,
+    this.failed = false,
+  });
+
+  final String message;
+  final List<String> followUps;
+  final bool analysisUsed;
+  final String? analysisAddress;
+  final bool failed;
+}
+
 class AiService {
   late String _authToken;
 
@@ -13,14 +31,20 @@ class AiService {
     _authToken = token;
   }
 
-  Future<String> generateResponse(
-    String prompt, {
+  /// Sends the prompt together with the attached 2GIS analysis and the recent
+  /// conversation, so follow-up questions stay grounded in the same report.
+  Future<AiChatReply> chat({
+    required String prompt,
     Map<String, dynamic>? locationContext,
     String language = 'az',
+    List<Map<String, String>> conversation = const [],
   }) async {
     final normalizedPrompt = prompt.trim();
     if (normalizedPrompt.isEmpty) {
-      return _message(language, 'emptyPrompt');
+      return AiChatReply(
+        message: _message(language, 'emptyPrompt'),
+        failed: true,
+      );
     }
 
     try {
@@ -28,26 +52,45 @@ class AiService {
       if (_authToken.isNotEmpty) {
         headers['Authorization'] = 'Bearer $_authToken';
       }
-      final response = await http.post(
-        Uri.parse('${ApiConfig.backendUrl}/api/chat'),
-        headers: headers,
-        body: jsonEncode({
-          'prompt': normalizedPrompt,
-          'language': language,
-          if (locationContext != null) 'location_context': locationContext,
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.backendUrl}/api/chat'),
+            headers: headers,
+            body: jsonEncode({
+              'prompt': normalizedPrompt,
+              'language': language,
+              'conversation': conversation,
+              if (locationContext != null) 'analysis_context': locationContext,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          return decoded['message']?.toString() ??
+          final message =
+              decoded['message']?.toString() ??
               decoded['response']?.toString() ??
-              'No response received.';
+              '';
+          final rawFollowUps = decoded['follow_ups'];
+          return AiChatReply(
+            message: message.isEmpty ? 'No response received.' : message,
+            followUps: rawFollowUps is List
+                ? rawFollowUps
+                      .map((item) => item.toString())
+                      .where((item) => item.trim().isNotEmpty)
+                      .toList()
+                : const [],
+            analysisUsed: decoded['analysis_used'] == true,
+            analysisAddress: decoded['analysis_address']?.toString(),
+          );
         }
-        return decoded.toString();
+        return AiChatReply(message: decoded.toString());
       } else if (response.statusCode == 401) {
-        return _message(language, 'sessionExpired');
+        return AiChatReply(
+          message: _message(language, 'sessionExpired'),
+          failed: true,
+        );
       }
       try {
         final decoded = jsonDecode(response.body);
@@ -55,18 +98,41 @@ class AiService {
           final message = decoded['message']?.toString();
           final error = decoded['error']?.toString();
           if (message != null && message.isNotEmpty) {
-            return error == null || error.isEmpty
-                ? message
-                : '$message: $error';
+            return AiChatReply(
+              message: error == null || error.isEmpty
+                  ? message
+                  : '$message: $error',
+              failed: true,
+            );
           }
         }
       } catch (_) {
         // Fall through to the status code when the server did not return JSON.
       }
-      return '${_message(language, 'serverError')} (${response.statusCode})';
+      return AiChatReply(
+        message:
+            '${_message(language, 'serverError')} (${response.statusCode})',
+        failed: true,
+      );
     } catch (e) {
-      return '${_message(language, 'connectionError')}: $e';
+      return AiChatReply(
+        message: '${_message(language, 'connectionError')}: $e',
+        failed: true,
+      );
     }
+  }
+
+  Future<String> generateResponse(
+    String prompt, {
+    Map<String, dynamic>? locationContext,
+    String language = 'az',
+  }) async {
+    final reply = await chat(
+      prompt: prompt,
+      locationContext: locationContext,
+      language: language,
+    );
+    return reply.message;
   }
 
   String _message(String language, String key) {
