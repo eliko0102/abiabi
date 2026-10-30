@@ -283,6 +283,10 @@ class AppLocalizations extends InheritedWidget {
       'whatsappNegotiation': 'WhatsApp danışıqlar mətni',
       'stopListening': 'Dinləməni dayandır',
       'voiceInput': 'Səslə yaz',
+      'voiceListening': 'Dinlənir… dayandırmaq üçün mikrofona toxunun',
+      'voiceUnavailable':
+          'Cihazda nitq tanıma mövcud deyil. Mikrofon icazəsini yoxlayın.',
+      'voiceError': 'Səsi tanımaq alınmadı. Yenidən cəhd edin.',
       'smsEmailWhatsapp': 'SMS, E-poçt, WhatsApp',
       'languageEnglish': 'English',
       'personaBaba': 'Müdrik Baba',
@@ -299,6 +303,8 @@ class AppLocalizations extends InheritedWidget {
       'login': 'Log in',
       'register': 'Sign up',
       'emailAddress': 'Email address',
+      'emailOrUsername': 'Email or username',
+      'welcomeBack': 'Welcome back',
       'fullName': 'Full name',
       'dateOfBirth': 'Date of birth',
       'selectDate': 'Select date',
@@ -516,6 +522,10 @@ class AppLocalizations extends InheritedWidget {
       'whatsappNegotiation': 'WhatsApp negotiation text',
       'stopListening': 'Stop listening',
       'voiceInput': 'Voice input',
+      'voiceListening': 'Listening… tap the microphone to stop',
+      'voiceUnavailable':
+          'Speech recognition is not available. Check the microphone permission.',
+      'voiceError': 'Could not recognise the speech. Try again.',
       'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
       'languageEnglish': 'English',
       'personaBaba': 'Wise Baba',
@@ -753,6 +763,10 @@ class AppLocalizations extends InheritedWidget {
       'whatsappNegotiation': 'Текст переговоров в WhatsApp',
       'stopListening': 'Остановить прослушивание',
       'voiceInput': 'Голосовой ввод',
+      'voiceListening': 'Слушаю… нажмите на микрофон, чтобы остановить',
+      'voiceUnavailable':
+          'Распознавание речи недоступно. Проверьте разрешение на микрофон.',
+      'voiceError': 'Не удалось распознать речь. Попробуйте снова.',
       'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
       'languageEnglish': 'English',
       'personaBaba': 'Мудрый Баба',
@@ -987,6 +1001,10 @@ class AppLocalizations extends InheritedWidget {
       'whatsappNegotiation': 'WhatsApp келіссөз мәтіні',
       'stopListening': 'Тыңдауды тоқтату',
       'voiceInput': 'Дауыспен енгізу',
+      'voiceListening': 'Тыңдап тұрмын… тоқтату үшін микрофонды түртіңіз',
+      'voiceUnavailable':
+          'Сөйлеуді тану қолжетімсіз. Микрофон рұқсатын тексеріңіз.',
+      'voiceError': 'Сөйлеуді тану мүмкін болмады. Қайта көріңіз.',
       'smsEmailWhatsapp': 'SMS, Email, WhatsApp',
       'languageEnglish': 'English',
       'personaBaba': 'Дана Баба',
@@ -4733,6 +4751,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final SpeechToText _speech = SpeechToText();
   final FlutterTts _tts = FlutterTts();
   bool _isListening = false;
+  bool _speechReady = false;
 
   /// The exact 2GIS snapshot attached from the map/report screens. Every
   /// follow-up question in this conversation is answered against it.
@@ -4753,11 +4772,15 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_messages.length == 1 && _messages[0].text.isEmpty) {
-      _messages[0] = _ChatMessage(
-        author: 'assistant',
-        text: AppLocalizations.of(context).t('assistantWelcome'),
-      );
+    // Bubbles hold rendered text, so switching the language would leave the
+    // opening message in the previous language. Rewrite it while it is still
+    // the only message in the conversation.
+    final welcome = AppLocalizations.of(context).t('assistantWelcome');
+    final onlyWelcome = _messages.length == 1 &&
+        _messages[0].author == 'assistant' &&
+        !_messages[0].isAnalysis;
+    if (onlyWelcome && _messages[0].text != welcome) {
+      _messages[0] = _ChatMessage(author: 'assistant', text: welcome);
     }
   }
 
@@ -4798,6 +4821,7 @@ class _ChatScreenState extends State<ChatScreen> {
           author: 'assistant',
           text: _formatAttachedAnalysis(handoff.analysis),
           isAnalysis: true,
+          analysis: handoff.analysis,
         ),
       );
     });
@@ -4886,20 +4910,69 @@ class _ChatScreenState extends State<ChatScreen> {
         '• ${loc.t('parking')}: $parking';
   }
 
+  /// Microphone button: the first tap starts a voice message, the second one
+  /// stops the recording and sends the transcribed text as a chat message.
   Future<void> _toggleListening() async {
+    if (_isSending) return;
     if (_isListening) {
-      await _speech.stop();
-      if (mounted) setState(() => _isListening = false);
+      await _finishVoiceMessage();
       return;
     }
-    final available = await _speech.initialize();
-    if (!available || !mounted) return;
+    final loc = AppLocalizations.of(context);
+    // Answers are read aloud; stop the speaker so the microphone does not
+    // transcribe the assistant back as a user message.
+    await _tts.stop();
+    final available = _speechReady ||
+        await _speech.initialize(
+          onError: (error) {
+            if (!mounted) return;
+            setState(() => _isListening = false);
+            _showVoiceNotice(loc.t('voiceError'));
+          },
+          onStatus: (status) {
+            if (status == 'done' || status == 'notListening') {
+              _finishVoiceMessage();
+            }
+          },
+        );
+    if (!mounted) return;
+    if (!available) {
+      _showVoiceNotice(loc.t('voiceUnavailable'));
+      return;
+    }
+    _speechReady = true;
+    _controller.text = '';
     setState(() => _isListening = true);
     await _speech.listen(
+      localeId: switch (loc.locale.languageCode) {
+        'en' => 'en_US',
+        'ru' => 'ru_RU',
+        'kk' => 'kk_KZ',
+        _ => 'az_AZ',
+      },
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
+      partialResults: true,
       onResult: (result) {
         if (!mounted) return;
         setState(() => _controller.text = result.recognizedWords);
       },
+    );
+  }
+
+  Future<void> _finishVoiceMessage() async {
+    if (!_isListening) return;
+    setState(() => _isListening = false);
+    await _speech.stop();
+    if (!mounted) return;
+    if (_controller.text.trim().isEmpty) return;
+    await _sendMessage();
+  }
+
+  void _showVoiceNotice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 
@@ -5017,6 +5090,11 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 ..._messages.map((message) {
                   final isUser = message.author == 'user';
+                  // Re-rendered on every build so the attached 2GIS report
+                  // follows a language switch instead of freezing the wording.
+                  final body = message.analysis == null
+                      ? message.text
+                      : _formatAttachedAnalysis(message.analysis!);
                   return Align(
                     alignment: isUser
                         ? Alignment.centerRight
@@ -5059,7 +5137,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             const SizedBox(height: 6),
                           ],
                           Text(
-                            message.text,
+                            body,
                             style: TextStyle(
                               color: isUser ? Colors.white : null,
                               height: 1.35,
@@ -5145,6 +5223,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+          if (_isListening)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Text(
+                loc.t('voiceListening'),
+                style: TextStyle(fontSize: 11, color: scheme.primary),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -5184,7 +5270,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   tooltip: _isListening
                       ? loc.t('stopListening')
                       : loc.t('voiceInput'),
-                  onPressed: _toggleListening,
+                  onPressed: _isSending ? null : _toggleListening,
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        _isListening ? const Color(0xFFA855F7) : null,
+                    foregroundColor: _isListening ? Colors.white : null,
+                  ),
                   icon: Icon(
                     _isListening ? Icons.stop : Icons.mic_none_rounded,
                   ),
@@ -5219,6 +5310,7 @@ class _ChatMessage {
     required this.author,
     required this.text,
     this.isAnalysis = false,
+    this.analysis,
   });
 
   final String author;
@@ -5226,6 +5318,9 @@ class _ChatMessage {
 
   /// Marks the bubble that carries the attached 2GIS snapshot.
   final bool isAnalysis;
+
+  /// Kept so the attached report can be re-rendered in the current language.
+  final Map<String, dynamic>? analysis;
 }
 
 // ============================================================

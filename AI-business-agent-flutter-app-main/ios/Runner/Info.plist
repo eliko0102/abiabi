@@ -6,6 +6,10 @@
 	<string>Profil şəklinizi seçmək üçün foto kitabxananıza giriş tələb olunur.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Xəritədə cari məkanınızı göstərmək üçün lokasiya icazəsi tələb olunur.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Çatda səslə mesaj yazmaq üçün mikrofon icazəsi tələb olunur.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Səslə mesajı mətnə çevirmək üçün nitq tanıma icazəsi tələb olunur.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
