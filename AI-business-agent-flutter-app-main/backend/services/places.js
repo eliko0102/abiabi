@@ -856,6 +856,29 @@ export async function searchPlaces({
     merged = dedupe([...extraResults.flat(), ...merged]);
   }
 
+  // 2GIS is the only source that usually knows a Latin spelling of a local
+  // business. When it is unavailable (missing key, quota, outage) a query like
+  // "Olzha" finds nothing in OSM, because the place is registered in Cyrillic
+  // ("ОЛЖА"). Retry the transliterated brand there, one request at a time to
+  // respect Nominatim's usage policy.
+  if (merged.length === 0 && variantQueries.length > 0) {
+    const cyrillicCity = /[а-яё]/i.test(cityScope)
+      ? cityScope
+      : transliterateToCyrillic(cityScope);
+    for (const variant of variantQueries.slice(0, 2)) {
+      const osmResults = await nominatimSearch(variant, {
+        city: cyrillicCity,
+        countryCode,
+        limit,
+        language: languageCode,
+      });
+      if (osmResults.length > 0) {
+        merged = dedupe([...merged, ...osmResults]);
+        break;
+      }
+    }
+  }
+
   if (isBrandQuery && merged.length > 0) {
     const relatedTerms = [...new Set([
       normalizedRoot,

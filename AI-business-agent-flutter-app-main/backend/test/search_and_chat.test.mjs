@@ -103,6 +103,57 @@ test('Aktau business search includes relevant Olzha suggestions', async () => {
   }
 });
 
+test('Latin brand falls back to its Cyrillic OSM name without a 2GIS key', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const osmQueries = [];
+  delete process.env.TWOGIS_API_KEY;
+  axios.defaults.adapter = async (config) => {
+    const query = String(config.params?.q || '');
+    const isOsm = String(config.url).includes('nominatim.openstreetmap.org');
+    if (!isOsm) throw new Error(`unexpected request without a 2GIS key: ${config.url}`);
+    osmQueries.push(query);
+    const items = query.includes('олжа')
+      ? [
+          {
+            lat: '43.6776391',
+            lon: '51.1631739',
+            name: 'ОЛЖА',
+            display_name: 'ОЛЖА, 30 микрорайон, Актау, Казахстан',
+            addresstype: 'shop',
+            address: {
+              suburb: '30 микрорайон',
+              city: 'Актау',
+              country: 'Казахстан',
+              country_code: 'kz',
+            },
+            osm_type: 'way',
+            osm_id: 384495765,
+            boundingbox: ['43.6768775', '43.67843', '51.1621561', '51.1641778'],
+          },
+        ]
+      : [];
+    return { data: items, status: 200, statusText: 'OK', headers: {}, config };
+  };
+
+  try {
+    const results = await searchPlaces({
+      q: 'Olzha',
+      city: 'Aktau',
+      countryCode: 'KZ',
+      language: 'ru',
+    });
+    assert.ok(osmQueries.includes('актау, олжа'));
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'ОЛЖА');
+    assert.equal(results[0].source, 'nominatim');
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
 test('search region can be selected independently or left worldwide', async () => {
   const previousKey = process.env.TWOGIS_API_KEY;
   const previousAdapter = axios.defaults.adapter;
