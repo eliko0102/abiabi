@@ -90,15 +90,46 @@ export function sanitizeHistory(conversation) {
   return merged.slice(-8);
 }
 
+const EMPTY_REPLY = {
+  az: {
+    empty: 'Model cavabı boş qaytardı. Sualı bir az konkretləşdirib yenidən göndər.',
+    truncated:
+      'Cavab token limitinə görə yarımçıq qaldı. Sualı daha qısa və konkret şəkildə yenidən göndər.',
+  },
+  en: {
+    empty: 'The model returned an empty answer. Make your question more specific and try again.',
+    truncated:
+      'The answer hit the token limit and was cut off. Please send a shorter, more specific question.',
+  },
+  ru: {
+    empty: 'Модель вернула пустой ответ. Уточните вопрос и попробуйте снова.',
+    truncated:
+      'Ответ оборвался из-за лимита токенов. Отправьте более короткий и конкретный вопрос.',
+  },
+  kk: {
+    empty: 'Модель бос жауап қайтарды. Сұрақты нақтылап, қайта жіберіңіз.',
+    truncated:
+      'Жауап токен шегіне жетіп, үзілді. Қысқарақ әрі нақты сұрақ жіберіңіз.',
+  },
+};
+
 const ANALYSIS_RULES = `Əgər mesajda 2GIS MƏKAN ANALİZİ (analysis) varsa:
 - Cavabı YALNIZ həmin rəqəmlərə əsaslandır (bal, rəqib sayı, məsafələr, parkinq, dayanacaq, rəylər).
 - Rəqəm verilməyibsə "bu göstərici 2GIS məlumatında yoxdur" yaz; rəqəm uydurma.
 - Rəqibləri adları və məsafələri ilə konkret qeyd et.
-- Cavabı mütləq bu üç başlıqla qur:
+- Əgər bu analiz üzrə İLK cavabdırsa, bu üç başlıqla qur:
   1) **Məkanın qiymətləndirilməsi** — ünvan, ümumi bal, əlçatanlıq və rəqabət.
   2) **İnsan axınını artırmaq üçün 3 addım** — hər addım 1-2 cümlə, icra edilə bilən.
   3) **Risklər və həlli** — parkinq, görünürlük, rəqabət üzrə konkret həll.
+- ƏVVƏLKİ SÖHBƏT varsa (davam sualıdırsa) həmin üç başlığı TƏKRARLAMA: istifadəçinin soruşduğu konkret mövzunu dərinləşdir.
 - Sonda 1 cümləlik "növbəti addım" yaz.`;
+
+const STYLE_RULES = `Üslub qaydaları:
+- Heç vaxt əvvəlki cavabı və ya eyni cümlələri təkrarlama; hər cavab əvvəlkinin üzərinə yeni məlumat qoyur.
+- Sual davam sualıdırsa, əvvəlki cavabın qaldığı yerdən davam et və həllini sona qədər izah et.
+- Hər tövsiyə üçün "nə / niyə / necə" izahı yaz; şablon başlıqları hər dəfə təkrar etmə.
+- Cavab 180-320 söz olsun, markdown siyahısı və qalın şriftlə oxunaqlı olsun.
+- Cavabı yarımçıq cümlə ilə bitirmə, bütün siyahıları bağla.`;
 
 /**
  * Builds the final prompt. Exported so the contract can be tested without
@@ -114,6 +145,8 @@ export function buildChatPrompt({ prompt, analysis, language = 'az', conversatio
 İstifadəçiyə ${languageName} dilində cavab ver.
 Ümumi və nəzəri məsləhət vermə; hər tövsiyə konkret və icra oluna bilən olsun.
 2GIS rəqəmsal görünürlüyü, yaxın nəqliyyat dayanacaqları, yaxın "maqnit" obyektlər, rəqiblərin zəif tərəfləri və giriş görünürlüyü barədə praktiki taktikalar ver.
+
+${STYLE_RULES}
 
 ${compact ? ANALYSIS_RULES : 'Hazırda 2GIS analizi yoxdur. Əgər sual konkret ünvanla bağlıdırsa, istifadəçidən ünvanı çatda göndərməsini xahiş et.'}${
     compact
@@ -131,31 +164,51 @@ ${compact ? ANALYSIS_RULES : 'Hazırda 2GIS analizi yoxdur. Əgər sual konkret 
 }
 
 /** Deterministic follow-up chips so the UI always has next steps. */
-export function buildFollowUps(analysis, language = 'az') {
+export function buildFollowUps(analysis, language = 'az', { turnIndex = 0, asked = [] } = {}) {
   const base = {
     az: [
       'Rəqibləri necə üstələyə bilərəm?',
       'İnsan axınını artırmaq üçün 7 günlük plan ver',
       'Bu məkan üçün əsas risklər nələrdir?',
       '2GIS-də görünürlüyü necə artırım?',
+      'Marketinq büdcəsini hara yönəltməliyəm?',
+      'Bu ünvanda hansı biznes formatı daha uyğundur?',
+      'Rəqiblərin zəif tərəflərini necə istifadə edim?',
+      'İlk 30 gün üçün hansı KPI-ları qoymalıyam?',
+      'Qiymət siyasətini necə qurmalıyam?',
     ],
     en: [
       'How can I outperform these competitors?',
       'Give me a 7-day plan to increase foot traffic',
       'What are the main risks of this location?',
       'How do I improve visibility on 2GIS?',
+      'Where should I spend my marketing budget?',
+      'Which business format fits this address best?',
+      'How do I exploit my competitors weaknesses?',
+      'Which KPIs should I track in the first 30 days?',
+      'How should I set my prices?',
     ],
     ru: [
       'Как обойти этих конкурентов?',
       'Дай план на 7 дней для роста трафика',
       'Какие главные риски у этой локации?',
       'Как повысить видимость в 2GIS?',
+      'Куда направить маркетинговый бюджет?',
+      'Какой формат бизнеса подходит этому адресу?',
+      'Как использовать слабые стороны конкурентов?',
+      'Какие KPI поставить на первые 30 дней?',
+      'Как выстроить цену?',
     ],
     kk: [
       'Бәсекелестерден қалай озуға болады?',
       'Трафикті арттыру үшін 7 күндік жоспар бер',
       'Бұл орынның негізгі тәуекелдері қандай?',
       '2GIS-те көрінуді қалай арттырамын?',
+      'Маркетинг бюджетін қайда жұмсаймын?',
+      'Бұл мекенжайға қандай бизнес форматы сәйкес келеді?',
+      'Бәсекелестердің әлсіз тұстарын қалай пайдаланамын?',
+      'Алғашқы 30 күнге қандай KPI қою керек?',
+      'Бағаны қалай құрамын?',
     ],
   };
   const items = [...(base[language] || base.az)];
@@ -181,7 +234,22 @@ export function buildFollowUps(analysis, language = 'az') {
             : 'Rəqabət yüksəkdir — necə fərqlənməliyəm?',
     );
   }
-  return [...new Set(items)].slice(0, 4);
+  // Rotate the pool and drop questions already asked in this conversation so
+  // the chips change from turn to turn instead of repeating the same four.
+  const unique = [...new Set(items)];
+  const offset = Number.isFinite(turnIndex) ? Math.abs(Math.trunc(turnIndex)) : 0;
+  const rotated =
+    offset % unique.length === 0
+      ? unique
+      : [
+          ...unique.slice(offset % unique.length),
+          ...unique.slice(0, offset % unique.length),
+        ];
+  const askedText = (Array.isArray(asked) ? asked : []).join(' ').toLowerCase();
+  const wasAsked = (item) => askedText.includes(item.toLowerCase().slice(0, 20));
+  const fresh = rotated.filter((item) => !wasAsked(item));
+  const picked = [...fresh, ...rotated.filter((item) => !fresh.includes(item))];
+  return picked.slice(0, 4);
 }
 
 router.post('/chat', async (req, res) => {
@@ -213,27 +281,51 @@ router.post('/chat', async (req, res) => {
       });
     }
 
+    const historyTurns = sanitizeHistory(conversation);
     const built = buildChatPrompt({
       prompt,
       analysis,
       language,
       conversation,
     });
-    const followUps = buildFollowUps(built.analysisUsed, language);
+    const followUps = buildFollowUps(built.analysisUsed, language, {
+      turnIndex: historyTurns.filter((item) => item.role === 'user').length,
+      asked: historyTurns
+        .filter((item) => item.role === 'user')
+        .map((item) => item.text),
+    });
 
     if (provider === 'gemini') {
       try {
-        const history = sanitizeHistory(conversation).map((item) => ({
+        const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        const contents = historyTurns.map((item) => ({
           role: item.role === 'user' ? 'user' : 'model',
           parts: [{ text: item.text }],
         }));
+        // Gemini rejects two consecutive user turns, so merge the new question
+        // into the pending user turn when the previous one never got an answer.
+        const lastTurn = contents[contents.length - 1];
+        if (lastTurn && lastTurn.role === 'user') {
+          lastTurn.parts[0].text =
+            `${lastTurn.parts[0].text}\n\n${built.fullPrompt}`.slice(0, 8000);
+        } else {
+          contents.push({ role: 'user', parts: [{ text: built.fullPrompt }] });
+        }
+
+        const generationConfig = { temperature: 0.55, maxOutputTokens: 3000 };
+        if (/2\.5.*flash/i.test(model)) {
+          // 2.5 Flash spends output tokens on "thinking" by default, which
+          // truncated answers; the chat needs the budget for the actual reply.
+          generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        } else if (/2\.5.*pro/i.test(model)) {
+          generationConfig.thinkingConfig = { thinkingBudget: 128 };
+        }
+
         const geminiResponse = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${
-            process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-          }:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
-            contents: [...history, { role: 'user', parts: [{ text: built.fullPrompt }] }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 1600 },
+            contents,
+            generationConfig,
           },
           {
             params: { key: apiKey },
@@ -242,17 +334,23 @@ router.post('/chat', async (req, res) => {
           },
         );
 
+        const candidate = geminiResponse.data?.candidates?.[0];
+        const finishReason = candidate?.finishReason;
         const aiMessage =
-          geminiResponse.data?.candidates?.[0]?.content?.parts
+          candidate?.content?.parts
             ?.map((part) => part?.text)
             .filter(Boolean)
-            .join('\n') || 'Süni intellekt cavab yarada bilmədi.';
+            .join('\n')
+            .trim() ||
+          (finishReason === 'MAX_TOKENS'
+            ? EMPTY_REPLY[language]?.truncated || EMPTY_REPLY.az.truncated
+            : EMPTY_REPLY[language]?.empty || EMPTY_REPLY.az.empty);
 
         return res.status(200).json({
           success: true,
           message: aiMessage,
           provider,
-          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+          model,
           analysis_used: Boolean(built.analysisUsed),
           analysis_address: built.analysisUsed?.address ?? null,
           follow_ups: followUps,
