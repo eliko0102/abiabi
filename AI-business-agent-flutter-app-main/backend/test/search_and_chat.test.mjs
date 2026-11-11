@@ -12,7 +12,9 @@ import {
   searchPlaces,
   brandOnly,
   transliterateToCyrillic,
+  transliterateToLatin,
   transliterationVariants,
+  crossScriptVariants,
 } from '../services/places.js';
 
 test('normalize folds Azerbaijani and Kazakh spellings', () => {
@@ -31,6 +33,14 @@ test('Latin business names fall back to their Cyrillic registration', () => {
   assert.deepEqual(transliterationVariants('Olzhai'), ['олжай', 'олжа', 'олжаи']);
   assert.equal(brandOnly('Olzha fitness club'), 'Olzha');
   assert.equal(brandOnly('fitness club'), '');
+});
+
+test('Cyrillic business names fall back to their Latin registration', () => {
+  assert.equal(transliterateToLatin('Олжа'), 'olzha');
+  assert.equal(transliterateToLatin('Олжа фитнес'), 'olzha fitness');
+  assert.equal(transliterateToLatin('Актау'), 'aktau');
+  assert.deepEqual(crossScriptVariants('Олжа'), ['olzha']);
+  assert.deepEqual(crossScriptVariants('Olzha'), ['олжа']);
 });
 
 test('Aktau business search includes relevant Olzha suggestions', async () => {
@@ -147,6 +157,96 @@ test('Latin brand falls back to its Cyrillic OSM name without a 2GIS key', async
     assert.equal(results.length, 1);
     assert.equal(results[0].name, 'ОЛЖА');
     assert.equal(results[0].source, 'nominatim');
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
+test('a Russian business query finds a Latin-registered business', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const requestedQueries = [];
+  process.env.TWOGIS_API_KEY = 'test-key';
+  axios.defaults.adapter = async (config) => {
+    const query = String(config.params?.q || '');
+    const isOsm = String(config.url).includes('nominatim.openstreetmap.org');
+    const onItems = String(config.url).endsWith('/3.0/items');
+    requestedQueries.push(query);
+    if (isOsm) {
+      return { data: [], status: 200, statusText: 'OK', headers: {}, config };
+    }
+    const items = !onItems || !query.toLowerCase().includes('olzha')
+      ? []
+      : [{
+          id: 'olzha-fitness-club',
+          name: 'Fitness Olzha Club',
+          address_name: '14 mkr, Aktau',
+          point: { lat: 43.653, lon: 51.16 },
+          adm_div: [{ type: 'city', name: 'Aktau' }],
+        }];
+    return {
+      data: { meta: { code: 200 }, result: { items } },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config,
+    };
+  };
+
+  try {
+    const results = await searchPlaces({
+      q: 'Олжа фитнес',
+      city: 'Aktau',
+      countryCode: 'KZ',
+      language: 'ru',
+    });
+    assert.ok(requestedQueries.some((query) => query === 'Aktau, olzha fitness'));
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Fitness Olzha Club');
+  } finally {
+    axios.defaults.adapter = previousAdapter;
+    if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;
+    else process.env.TWOGIS_API_KEY = previousKey;
+  }
+});
+
+test('a Russian brand query falls back to its Latin OSM name', async () => {
+  const previousKey = process.env.TWOGIS_API_KEY;
+  const previousAdapter = axios.defaults.adapter;
+  const osmQueries = [];
+  delete process.env.TWOGIS_API_KEY;
+  axios.defaults.adapter = async (config) => {
+    const query = String(config.params?.q || '');
+    const isOsm = String(config.url).includes('nominatim.openstreetmap.org');
+    if (!isOsm) throw new Error(`unexpected request without a 2GIS key: ${config.url}`);
+    osmQueries.push(query);
+    const items = query.includes('olzha')
+      ? [{
+          lat: '43.6530000',
+          lon: '51.1600000',
+          name: 'Fitness Olzha Club',
+          display_name: 'Fitness Olzha Club, 14 микрорайон, Актау, Казахстан',
+          addresstype: 'gym',
+          address: { suburb: '14 микрорайон', city: 'Актау', country: 'Казахстан', country_code: 'kz' },
+          osm_type: 'node',
+          osm_id: 384495766,
+        }]
+      : [];
+    return { data: items, status: 200, statusText: 'OK', headers: {}, config };
+  };
+
+  try {
+    const results = await searchPlaces({
+      q: 'Олжа',
+      city: 'Актау',
+      countryCode: 'KZ',
+      language: 'ru',
+    });
+    assert.ok(osmQueries.includes('aktau, olzha'));
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Fitness Olzha Club');
   } finally {
     axios.defaults.adapter = previousAdapter;
     if (previousKey === undefined) delete process.env.TWOGIS_API_KEY;

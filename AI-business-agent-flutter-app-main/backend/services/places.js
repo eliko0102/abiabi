@@ -160,6 +160,108 @@ export function transliterationVariants(value = '') {
   return [...variants].filter(Boolean);
 }
 
+const REVERSE_WORD_TRANSLITERATIONS = Object.fromEntries(
+  Object.entries(WORD_TRANSLITERATIONS).map(([latin, cyrillic]) => [cyrillic, latin]),
+);
+
+const LATIN_RULES = [
+  ['щ', 'shch'],
+  ['ж', 'zh'],
+  ['х', 'kh'],
+  ['ц', 'ts'],
+  ['ч', 'ch'],
+  ['ш', 'sh'],
+  ['ю', 'yu'],
+  ['я', 'ya'],
+  ['ё', 'yo'],
+  ['й', 'y'],
+  ['ъ', ''],
+  ['ь', ''],
+  ['а', 'a'],
+  ['б', 'b'],
+  ['в', 'v'],
+  ['г', 'g'],
+  ['д', 'd'],
+  ['е', 'e'],
+  ['з', 'z'],
+  ['и', 'i'],
+  ['к', 'k'],
+  ['л', 'l'],
+  ['м', 'm'],
+  ['н', 'n'],
+  ['о', 'o'],
+  ['п', 'p'],
+  ['р', 'r'],
+  ['с', 's'],
+  ['т', 't'],
+  ['у', 'u'],
+  ['ф', 'f'],
+  ['ы', 'y'],
+  ['э', 'e'],
+];
+
+function transliterateCyrillicWord(value) {
+  const lower = String(value).toLowerCase();
+  let result = '';
+  for (const char of lower) {
+    const rule = LATIN_RULES.find(([cyrillic]) => cyrillic === char);
+    result += rule ? rule[1] : char;
+  }
+  return result;
+}
+
+/**
+ * The other direction of transliterationToCyrillic: "Олжа" -> "olzha".
+ * Businesses in Kazakhstan are often registered in 2GIS under a Latin name
+ * even though users type the Russian spelling, so a Cyrillic query has to be
+ * able to match a Latin result and vice versa.
+ */
+export function transliterateToLatin(value = '') {
+  return String(value)
+    .split(/(\s+)/)
+    .map((part) => {
+      const known = REVERSE_WORD_TRANSLITERATIONS[normalize(part)];
+      if (known) return known;
+      return transliterateCyrillicWord(part);
+    })
+    .join('');
+}
+
+/** Which alphabet a search text is written in. */
+export function scriptOf(value = '') {
+  const text = String(value);
+  const hasLatin = /[a-z]/i.test(text);
+  const hasCyrillic = /[а-яё]/i.test(text);
+  if (hasLatin && hasCyrillic) return 'mixed';
+  if (hasCyrillic) return 'cyrillic';
+  if (hasLatin) return 'latin';
+  return 'none';
+}
+
+/**
+ * The same query written in the other alphabet. A Latin query returns its
+ * Cyrillic forms, a Cyrillic query returns its Latin forms, so both spellings
+ * of the same place are always searched.
+ */
+export function crossScriptVariants(value = '') {
+  const text = String(value).trim();
+  if (!text) return [];
+  return scriptOf(text) === 'cyrillic'
+    ? [transliterateToLatin(text)]
+    : transliterationVariants(text);
+}
+
+/** Every spelling of a text that search treats as the same name. */
+function searchForms(value = '') {
+  const base = normalize(value);
+  if (!base) return [];
+  return [...new Set([
+    base,
+    normalize(transliterateToCyrillic(base)),
+    normalize(transliterateToLatin(base)),
+  ])].filter(Boolean);
+}
+
 const CATEGORY_WORDS = new Set([
   'fitness',
   'gym',
@@ -830,12 +932,14 @@ export async function searchPlaces({
     !isExactCityQuery(normalizedQuery) &&
     requestedTypes.size === 0 &&
     !countryHit;
-  const variants =
-    /[a-z]/i.test(query) &&
-    (!countryCode || ['KZ', 'AZ', 'RU', 'KG', 'UZ', 'GE', 'AM', 'BY', 'TJ', 'TM'].includes(countryCode))
+  const transliterableCountry =
+    !countryCode || ['KZ', 'AZ', 'RU', 'KG', 'UZ', 'GE', 'AM', 'BY', 'TJ', 'TM'].includes(countryCode);
+  // Both alphabets are always searched: a Latin query also tries the Cyrillic
+  // registration, and a Russian query also tries the Latin one.
+  const variants = transliterableCountry && scriptOf(query) !== 'none'
       ? [
-          ...transliterationVariants(query),
-          ...(brand ? transliterationVariants(brand) : []),
+          ...crossScriptVariants(query),
+          ...(brand ? crossScriptVariants(brand) : []),
         ]
       : [];
   const variantQueries = [...new Set(variants)].filter(
@@ -862,12 +966,13 @@ export async function searchPlaces({
   // ("ОЛЖА"). Retry the transliterated brand there, one request at a time to
   // respect Nominatim's usage policy.
   if (merged.length === 0 && variantQueries.length > 0) {
-    const cyrillicCity = /[а-яё]/i.test(cityScope)
-      ? cityScope
-      : transliterateToCyrillic(cityScope);
+    const cityIsCyrillic = scriptOf(cityScope) === 'cyrillic';
+    const cyrillicCity = cityIsCyrillic ? cityScope : transliterateToCyrillic(cityScope);
+    const latinCity = cityIsCyrillic ? transliterateToLatin(cityScope) : cityScope;
     for (const variant of variantQueries.slice(0, 2)) {
+      // Nominatim matches best when the city and the query share one script.
       const osmResults = await nominatimSearch(variant, {
-        city: cyrillicCity,
+        city: scriptOf(variant) === 'cyrillic' ? cyrillicCity : latinCity,
         countryCode,
         limit,
         language: languageCode,
@@ -880,16 +985,21 @@ export async function searchPlaces({
   }
 
   if (isBrandQuery && merged.length > 0) {
+    // Compare in both alphabets, otherwise a Russian query for a business that
+    // 2GIS stores as "Fitness Olzha Club" filters its own result out.
     const relatedTerms = [...new Set([
-      normalizedRoot,
+      ...searchForms(categoryRoot),
       ...normalizedRoot
         .split(' ')
-        .filter((term) => term.length >= 3 && !CATEGORY_WORDS.has(term)),
-      ...variants.map(normalize),
+        .filter((term) => term.length >= 3 && !CATEGORY_WORDS.has(term))
+        .flatMap((term) => searchForms(term)),
+      ...variants.flatMap((variant) => searchForms(variant)),
     ].filter(Boolean))];
     const related = merged.filter((item) => {
-      const searchable = normalize(`${item.name} ${item.subtitle}`);
-      return relatedTerms.some((term) => searchable.includes(term));
+      const searchable = searchForms(`${item.name} ${item.subtitle}`);
+      return searchable.some((form) =>
+        relatedTerms.some((term) => form.includes(term)),
+      );
     });
     merged = related;
   }
